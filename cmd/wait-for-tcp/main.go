@@ -92,11 +92,11 @@ func logMessage(output io.Writer, message string, details map[string]interface{}
 // runLoop continuously attempts to connect to the specified service
 // at regular intervals until the service becomes available or the context
 // is cancelled. It handles OS signals for graceful shutdown.
-func runLoop(ctx context.Context, envVars Vars, dial DialFunc, stderr io.Writer) error {
+func runLoop(ctx context.Context, envVars Vars, dial DialFunc, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	logMessage(stderr, "Waiting for service to become ready...", map[string]interface{}{
+	logMessage(output, "Waiting for service to become ready...", map[string]interface{}{
 		"target_name": envVars.TargetName,
 		"address":     envVars.Address,
 	})
@@ -114,7 +114,7 @@ func runLoop(ctx context.Context, envVars Vars, dial DialFunc, stderr io.Writer)
 			return ctx.Err()
 		case <-ticker.C:
 			if err := checkConnection(ctx, dial, envVars.Address, envVars.DialTimeout); err != nil {
-				logMessage(stderr, "Connection attempt failed", map[string]interface{}{
+				logMessage(output, "Connection attempt failed", map[string]interface{}{
 					"target_name": envVars.TargetName,
 					"address":     envVars.Address,
 					"error":       err.Error(),
@@ -122,7 +122,7 @@ func runLoop(ctx context.Context, envVars Vars, dial DialFunc, stderr io.Writer)
 				continue
 			}
 
-			logMessage(stderr, "Service became ready", map[string]interface{}{
+			logMessage(output, "Service became ready", map[string]interface{}{
 				"target_name": envVars.TargetName,
 				"address":     envVars.Address,
 			})
