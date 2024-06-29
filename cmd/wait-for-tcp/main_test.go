@@ -56,7 +56,7 @@ func TestParseEnv(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if envVars != expected {
-			t.Errorf("Expected %v, got %v", expected, envVars)
+			t.Errorf("Expected '%v', got '%v'", expected, envVars)
 		}
 	})
 
@@ -129,7 +129,7 @@ func TestCheckConnection(t *testing.T) {
 	})
 }
 
-func TestRunCheckerLoop(t *testing.T) {
+func TestRunLoop(t *testing.T) {
 	t.Run("Service becomes ready", func(t *testing.T) {
 		envVars := Vars{
 			TargetName:  "database",
@@ -139,7 +139,6 @@ func TestRunCheckerLoop(t *testing.T) {
 		}
 
 		dialer := &mockDialer{}
-
 		var output strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -154,9 +153,9 @@ func TestRunCheckerLoop(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "Waiting for database to become ready at localhost:5432...\ndatabase OK ✓"
+		expected := "msg=\"Service became ready\""
 		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
 	})
 
@@ -169,7 +168,6 @@ func TestRunCheckerLoop(t *testing.T) {
 		}
 
 		dialer := &mockDialer{err: errors.New("connection error")}
-
 		var output strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -184,9 +182,9 @@ func TestRunCheckerLoop(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "Waiting for database: connection error"
+		expected := "\"Connection attempt failed\""
 		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
 	})
 }
@@ -218,9 +216,9 @@ func TestRun(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "Waiting for database to become ready at google.com:80...\ndatabase OK ✓"
+		expected := "msg=\"Service became ready\" target_name=database address=google.com:80"
 		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
 	})
 

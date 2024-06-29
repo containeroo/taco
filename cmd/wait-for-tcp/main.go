@@ -50,7 +50,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		}
 	}
 
-	// TCP connections required a port
+	// Ensure address includes a port
 	if !strings.Contains(env.Address, ":") {
 		return env, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
 	}
@@ -80,6 +80,15 @@ func checkConnection(ctx context.Context, dial DialFunc, address string, timeout
 	return nil
 }
 
+// logMessage logs a message in structured key-value pairs format.
+func logMessage(output io.Writer, message string, details map[string]interface{}) {
+	logEntry := fmt.Sprintf("ts=%s level=info msg=%q", time.Now().Format(time.RFC3339), message)
+	for k, v := range details {
+		logEntry += fmt.Sprintf(" %s=%v", k, v)
+	}
+	fmt.Fprintln(output, logEntry)
+}
+
 // runLoop continuously attempts to connect to the specified service
 // at regular intervals until the service becomes available or the context
 // is cancelled. It handles OS signals for graceful shutdown.
@@ -87,7 +96,10 @@ func runLoop(ctx context.Context, envVars Vars, dial DialFunc, stderr io.Writer)
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	fmt.Fprintf(stderr, "Waiting for %s to become ready at %s...\n", envVars.TargetName, envVars.Address)
+	logMessage(stderr, "Waiting for service to become ready...", map[string]interface{}{
+		"target_name": envVars.TargetName,
+		"address":     envVars.Address,
+	})
 
 	ticker := time.NewTicker(envVars.Interval)
 	defer ticker.Stop()
@@ -102,11 +114,18 @@ func runLoop(ctx context.Context, envVars Vars, dial DialFunc, stderr io.Writer)
 			return ctx.Err()
 		case <-ticker.C:
 			if err := checkConnection(ctx, dial, envVars.Address, envVars.DialTimeout); err != nil {
-				fmt.Fprintf(stderr, "%s - Waiting for %s: %v\n", time.Now().Format(time.RFC3339), envVars.TargetName, err)
+				logMessage(stderr, "Connection attempt failed", map[string]interface{}{
+					"target_name": envVars.TargetName,
+					"address":     envVars.Address,
+					"error":       err.Error(),
+				})
 				continue
 			}
 
-			fmt.Fprintf(stderr, "%s OK ✓\n", envVars.TargetName)
+			logMessage(stderr, "Service became ready", map[string]interface{}{
+				"target_name": envVars.TargetName,
+				"address":     envVars.Address,
+			})
 			cancel()
 			return nil
 		}
