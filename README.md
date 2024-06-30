@@ -11,6 +11,12 @@ The application requires the following environment variables to be set:
 - `INTERVAL`: The interval between connection attempts (optional, default: `2s`).
 - `DIAL_TIMEOUT`: The timeout for each connection attempt (optional, default: `2s`).
 
+## Behavior
+
+- The application performs a single connection check to the specified target.
+- If the connection attempt fails, it waits for the specified `INTERVAL` before attempting to connect again.
+- The process repeats until the service becomes available or the program is terminated.
+
 ## Kubernetes Init Container Configuration
 
 Configure your Kubernetes deployment to use this init container:
