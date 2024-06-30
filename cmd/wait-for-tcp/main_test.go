@@ -9,28 +9,6 @@ import (
 	"time"
 )
 
-type mockDialer struct {
-	err error
-}
-
-func (m *mockDialer) DialContext(ctx context.Context, network, address string, timeout time.Duration) (net.Conn, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return &mockConn{}, nil
-}
-
-type mockConn struct{}
-
-func (m *mockConn) Read(b []byte) (n int, err error)   { return 0, nil }
-func (m *mockConn) Write(b []byte) (n int, err error)  { return len(b), nil }
-func (m *mockConn) Close() error                       { return nil }
-func (m *mockConn) LocalAddr() net.Addr                { return nil }
-func (m *mockConn) RemoteAddr() net.Addr               { return nil }
-func (m *mockConn) SetDeadline(t time.Time) error      { return nil }
-func (m *mockConn) SetReadDeadline(t time.Time) error  { return nil }
-func (m *mockConn) SetWriteDeadline(t time.Time) error { return nil }
-
 func TestParseEnv(t *testing.T) {
 	t.Run("Valid environment variables", func(t *testing.T) {
 		env := map[string]string{
@@ -45,10 +23,10 @@ func TestParseEnv(t *testing.T) {
 		}
 
 		expected := Vars{
-			TargetName:  "database",
-			Address:     "localhost:5432",
-			Interval:    1 * time.Second,
-			DialTimeout: 1 * time.Second,
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      1 * time.Second,
+			DialTimeout:   1 * time.Second,
 		}
 
 		envVars, err := parseEnv(getenv)
@@ -69,8 +47,7 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		_, err := parseEnv(getenv)
-		if err == nil {
+		if _, err := parseEnv(getenv); err == nil {
 			t.Error("Expected error but got none")
 		}
 	})
@@ -86,8 +63,7 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		_, err := parseEnv(getenv)
-		if err == nil {
+		if _, err := parseEnv(getenv); err == nil {
 			t.Error("Expected error but got none")
 		}
 	})
@@ -102,8 +78,7 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		_, err := parseEnv(getenv)
-		if err == nil {
+		if _, err := parseEnv(getenv); err == nil {
 			t.Error("Expected error but got none")
 		}
 	})
@@ -111,18 +86,23 @@ func TestParseEnv(t *testing.T) {
 
 func TestCheckConnection(t *testing.T) {
 	t.Run("Successful connection", func(t *testing.T) {
-		dialer := &mockDialer{}
-		ctx := context.Background()
-		err := checkConnection(ctx, dialer.DialContext, "localhost:5432", 1*time.Second)
+		// Setup a mock server to listen on
+		targetAddress := "127.0.0.1:5432"
+		lis, err := net.Listen("tcp", targetAddress)
 		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		defer lis.Close()
+
+		ctx := context.Background()
+		if err := checkConnection(ctx, targetAddress, 1*time.Second); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	})
 
 	t.Run("Failed connection", func(t *testing.T) {
-		dialer := &mockDialer{err: errors.New("connection error")}
 		ctx := context.Background()
-		err := checkConnection(ctx, dialer.DialContext, "localhost:5432", 1*time.Second)
+		err := checkConnection(ctx, "127.0.0.1:5433", 1*time.Second)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -132,13 +112,19 @@ func TestCheckConnection(t *testing.T) {
 func TestRunLoop(t *testing.T) {
 	t.Run("Service becomes ready", func(t *testing.T) {
 		envVars := Vars{
-			TargetName:  "database",
-			Address:     "localhost:5432",
-			Interval:    1 * time.Second,
-			DialTimeout: 1 * time.Second,
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      1 * time.Second,
+			DialTimeout:   1 * time.Second,
 		}
 
-		dialer := &mockDialer{}
+		// Setup a mock server to listen on localhost:5432
+		lis, err := net.Listen("tcp", envVars.TargetAddress)
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		defer lis.Close()
+
 		var output strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -148,7 +134,7 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		err := runLoop(ctx, envVars, dialer.DialContext, &output)
+		err = runLoop(ctx, envVars, &output)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -161,13 +147,12 @@ func TestRunLoop(t *testing.T) {
 
 	t.Run("Service fails to become ready", func(t *testing.T) {
 		envVars := Vars{
-			TargetName:  "database",
-			Address:     "localhost:5432",
-			Interval:    1 * time.Second,
-			DialTimeout: 1 * time.Second,
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      1 * time.Second,
+			DialTimeout:   1 * time.Second,
 		}
 
-		dialer := &mockDialer{err: errors.New("connection error")}
 		var output strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -177,7 +162,7 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		err := runLoop(ctx, envVars, dialer.DialContext, &output)
+		err := runLoop(ctx, envVars, &output)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -193,7 +178,7 @@ func TestRun(t *testing.T) {
 	t.Run("Successful run", func(t *testing.T) {
 		env := map[string]string{
 			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "google.com:80",
+			"TARGET_ADDRESS": "localhost:5432",
 			"INTERVAL":       "1s",
 			"DIAL_TIMEOUT":   "1s",
 		}
@@ -201,6 +186,13 @@ func TestRun(t *testing.T) {
 		getenv := func(key string) string {
 			return env[key]
 		}
+
+		// Setup a mock server to listen on
+		lis, err := net.Listen("tcp", env["TARGET_ADDRESS"])
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		defer lis.Close()
 
 		var output strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
@@ -211,12 +203,12 @@ func TestRun(t *testing.T) {
 			cancel()
 		}()
 
-		err := run(ctx, getenv, &output, defaultDialTCPContext)
+		err = run(ctx, getenv, &output)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "msg=\"Service became ready\" target_name=database address=google.com:80"
+		expected := "msg=\"Service became ready\" target_name=database address=localhost:5432"
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
@@ -243,7 +235,7 @@ func TestRun(t *testing.T) {
 			cancel()
 		}()
 
-		err := run(ctx, getenv, &output, defaultDialTCPContext)
+		err := run(ctx, getenv, &output)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
