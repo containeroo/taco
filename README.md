@@ -1,4 +1,4 @@
-# Service Checker
+# wait-for-tcp
 
 This is a simple Go application that checks if a specified TCP service is available. It continuously attempts to connect to the specified service at regular intervals until the service becomes available or the program is terminated.
 
