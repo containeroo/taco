@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -94,23 +95,35 @@ func TestCheckConnection(t *testing.T) {
 		}
 		defer lis.Close()
 
+		dialer := &net.Dialer{
+			Timeout: 2 * time.Second,
+		}
+
 		ctx := context.Background()
-		if err := checkConnection(ctx, targetAddress, 1*time.Second); err != nil {
+		if err := checkConnection(ctx, *dialer, targetAddress); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	})
 
 	t.Run("Failed connection", func(t *testing.T) {
+		targetAddress := "invalid.nonexistent:5432"
+
+		dialer := &net.Dialer{
+			Timeout: 2 * time.Second,
+		}
+
 		ctx := context.Background()
-		err := checkConnection(ctx, "127.0.0.1:5433", 1*time.Second)
+		err := checkConnection(ctx, *dialer, targetAddress)
 		if err == nil {
 			t.Error("Expected error but got none")
+		} else {
+			fmt.Printf("Expected error occurred: %v\n", err)
 		}
 	})
 }
 
 func TestRunLoop(t *testing.T) {
-	t.Run("Service becomes ready", func(t *testing.T) {
+	t.Run("Target becomes ready", func(t *testing.T) {
 		envVars := Vars{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
@@ -139,13 +152,13 @@ func TestRunLoop(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "msg=\"Service became ready\""
+		expected := "msg=\"Target became ready ✓\""
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
 	})
 
-	t.Run("Service fails to become ready", func(t *testing.T) {
+	t.Run("Target fails to become ready", func(t *testing.T) {
 		envVars := Vars{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
@@ -167,7 +180,7 @@ func TestRunLoop(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "\"Connection attempt failed\""
+		expected := "\"Connection attempt failed ✗\""
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
@@ -176,19 +189,15 @@ func TestRunLoop(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	t.Run("Successful run", func(t *testing.T) {
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost:5432",
-			"INTERVAL":       "1s",
-			"DIAL_TIMEOUT":   "1s",
-		}
-
-		getenv := func(key string) string {
-			return env[key]
+		envVars := Vars{
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      1 * time.Second,
+			DialTimeout:   1 * time.Second,
 		}
 
 		// Setup a mock server to listen on
-		lis, err := net.Listen("tcp", env["TARGET_ADDRESS"])
+		lis, err := net.Listen("tcp", envVars.TargetAddress)
 		if err != nil {
 			t.Fatalf("failed to listen: %v", err)
 		}
@@ -203,27 +212,22 @@ func TestRun(t *testing.T) {
 			cancel()
 		}()
 
-		err = run(ctx, getenv, &output)
-		if err != nil {
+		if err := runLoop(ctx, envVars, &output); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "msg=\"Service became ready\" target_name=database address=localhost:5432"
+		expected := fmt.Sprintf("msg=\"Target became ready ✓\" target_name=%s address=%s", envVars.TargetName, envVars.TargetAddress)
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
 	})
 
 	t.Run("Failed connection", func(t *testing.T) {
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost:5432",
-			"INTERVAL":       "1s",
-			"DIAL_TIMEOUT":   "1s",
-		}
-
-		getenv := func(key string) string {
-			return env[key]
+		envVars := Vars{
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      1 * time.Second,
+			DialTimeout:   1 * time.Second,
 		}
 
 		var output strings.Builder
@@ -235,8 +239,7 @@ func TestRun(t *testing.T) {
 			cancel()
 		}()
 
-		err := run(ctx, getenv, &output)
-		if err != nil {
+		if err := runLoop(ctx, envVars, &output); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 

@@ -13,15 +13,17 @@ import (
 	"time"
 )
 
-// Vars holds the environment variables required for the service checker.
+const version = "0.0.3"
+
+// Vars holds the environment variables required for the target checker.
 type Vars struct {
-	TargetName    string        // The name of the service to check.
-	TargetAddress string        // The address of the service in the format 'host:port'.
+	TargetName    string        // The name of the target to check.
+	TargetAddress string        // The address of the target in the format 'host:port'.
 	Interval      time.Duration // The interval between connection attempts.
 	DialTimeout   time.Duration // The timeout for each connection attempt.
 }
 
-// parseEnv retrieves and validates the environment variables required for the service checker.
+// parseEnv retrieves and validates the environment variables required for the target checker.
 func parseEnv(getenv func(string) string) (Vars, error) {
 	env := Vars{
 		TargetName:    getenv("TARGET_NAME"),
@@ -59,12 +61,8 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 }
 
 // checkConnection attempts to establish a connection to the given address within the specified timeout.
-func checkConnection(ctx context.Context, address string, timeout time.Duration) error {
-	d := net.Dialer{
-		Timeout: timeout,
-	}
-
-	conn, err := d.DialContext(ctx, "tcp", address)
+func checkConnection(ctx context.Context, dialer net.Dialer, address string) error {
+	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
 		return err
 	}
@@ -82,30 +80,37 @@ func logMessage(output io.Writer, level string, message string, details map[stri
 	fmt.Fprintln(output, logEntry)
 }
 
-// runLoop continuously attempts to connect to the specified service
-// at regular intervals until the service becomes available or the context
+// runLoop continuously attempts to connect to the specified target
+// at regular intervals until the target becomes available or the context
 // is cancelled. It handles OS signals for graceful shutdown.
 func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	logMessage(output, "info", "Waiting for service to become ready...", map[string]interface{}{
+	logMessage(output, "info", fmt.Sprintf("Starting 'wait-for-tcp' (version: %s)", version), map[string]interface{}{
 		"target_name": envVars.TargetName,
 		"address":     envVars.TargetAddress,
+		"version":     version,
 	})
 
+	dialer := net.Dialer{
+		Timeout: envVars.DialTimeout,
+	}
+
 	// Run the first check immediately
-	if err := checkConnection(ctx, envVars.TargetAddress, envVars.DialTimeout); err != nil {
-		logMessage(output, "warn", "Initial connection attempt failed", map[string]interface{}{
+	if err := checkConnection(ctx, dialer, envVars.TargetAddress); err != nil {
+		logMessage(output, "warn", "Initial connection attempt failed ✗", map[string]interface{}{
 			"target_name": envVars.TargetName,
 			"address":     envVars.TargetAddress,
 			"error":       err.Error(),
 		})
 	} else {
-		logMessage(output, "info", "Service became ready", map[string]interface{}{
+		logMessage(output, "info", "Target became ready ✓", map[string]interface{}{
 			"target_name": envVars.TargetName,
 			"address":     envVars.TargetAddress,
 		})
+
+		cancel() // Stop further checks since the target is ready
 
 		return nil
 	}
@@ -122,8 +127,8 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 			}
 			return ctx.Err()
 		case <-ticker.C:
-			if err := checkConnection(ctx, envVars.TargetAddress, envVars.DialTimeout); err != nil {
-				logMessage(output, "warn", "Connection attempt failed", map[string]interface{}{
+			if err := checkConnection(ctx, dialer, envVars.TargetAddress); err != nil {
+				logMessage(output, "warn", "Connection attempt failed ✗", map[string]interface{}{
 					"target_name": envVars.TargetName,
 					"address":     envVars.TargetAddress,
 					"error":       err.Error(),
@@ -131,19 +136,19 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 				continue
 			}
 
-			logMessage(output, "info", "Service became ready", map[string]interface{}{
+			logMessage(output, "info", "Target became ready ✓", map[string]interface{}{
 				"target_name": envVars.TargetName,
 				"address":     envVars.TargetAddress,
 			})
 
-			cancel()
+			cancel() // Stop further checks since the target is ready
 
 			return nil
 		}
 	}
 }
 
-// run is the main entry point for running the service checker.
+// run is the main entry point for running the target checker.
 // It initializes the environment variables, sets up the checker, and starts the checking loop.
 func run(ctx context.Context, getenv func(string) string, output io.Writer) error {
 	envVars, err := parseEnv(getenv)
