@@ -34,6 +34,11 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		return env, fmt.Errorf("TARGET_NAME and TARGET_ADDRESS environment variables are required")
 	}
 
+	// Ensure address includes a port
+	if !strings.Contains(env.Address, ":") {
+		return env, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
+	}
+
 	if intervalStr := getenv("INTERVAL"); intervalStr != "" {
 		var err error
 		env.Interval, err = time.ParseDuration(intervalStr)
@@ -48,11 +53,6 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		if err != nil {
 			return env, fmt.Errorf("invalid dial timeout value: %s", err)
 		}
-	}
-
-	// Ensure address includes a port
-	if !strings.Contains(env.Address, ":") {
-		return env, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
 	}
 
 	return env, nil
@@ -95,7 +95,6 @@ func logMessage(output io.Writer, message string, details map[string]interface{}
 func runLoop(ctx context.Context, envVars Vars, dial DialFunc, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-
 	logMessage(output, "Waiting for service to become ready...", map[string]interface{}{
 		"target_name": envVars.TargetName,
 		"address":     envVars.Address,
