@@ -6,8 +6,8 @@ This is a simple Go application that checks if a specified TCP service is availa
 
 The application requires the following environment variables to be set:
 
-- `TARGET_NAME`: The name of the service to check.
-- `TARGET_ADDRESS`: The address of the service in the format `host:port`.
+- `TARGET_NAME`: The name of the target to check.
+- `TARGET_ADDRESS`: The address of the target in the format `host:port`.
 - `INTERVAL`: The interval between connection attempts (optional, default: `2s`).
 - `DIAL_TIMEOUT`: The timeout for each connection attempt (optional, default: `2s`).
 
