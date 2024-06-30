@@ -100,7 +100,7 @@ func TestCheckConnection(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		if err := checkConnection(ctx, *dialer, targetAddress); err != nil {
+		if err := checkConnection(ctx, dialer, targetAddress); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	})
@@ -113,7 +113,7 @@ func TestCheckConnection(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		err := checkConnection(ctx, *dialer, targetAddress)
+		err := checkConnection(ctx, dialer, targetAddress)
 		if err == nil {
 			t.Error("Expected error but got none")
 		} else {

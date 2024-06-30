@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const version = "0.0.4"
+const version = "0.0.5"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -61,7 +61,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 }
 
 // checkConnection attempts to establish a connection to the given address within the specified timeout.
-func checkConnection(ctx context.Context, dialer net.Dialer, address string) error {
+func checkConnection(ctx context.Context, dialer *net.Dialer, address string) error {
 	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 		"address":     envVars.TargetAddress,
 	})
 
-	dialer := net.Dialer{
+	dialer := &net.Dialer{
 		Timeout: envVars.DialTimeout,
 	}
 
@@ -125,7 +125,6 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 }
 
 // run is the main entry point for running the target checker.
-// It initializes the environment variables, sets up the checker, and starts the checking loop.
 func run(ctx context.Context, getenv func(string) string, output io.Writer) error {
 	envVars, err := parseEnv(getenv)
 	if err != nil {
@@ -140,7 +139,9 @@ func main() {
 	defer cancel()
 
 	if err := run(ctx, os.Getenv, os.Stderr); err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
+		logMessage(os.Stderr, "error", "Service check failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		os.Exit(1)
 	}
 }
