@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const version = "0.0.3"
+const version = "0.0.4"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -80,70 +80,46 @@ func logMessage(output io.Writer, level string, message string, details map[stri
 	fmt.Fprintln(output, logEntry)
 }
 
-// runLoop continuously attempts to connect to the specified target
-// at regular intervals until the target becomes available or the context
-// is cancelled. It handles OS signals for graceful shutdown.
+// runLoop continuously attempts to connect to the specified service until the service becomes available or the context is cancelled.
 func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	logMessage(output, "info", fmt.Sprintf("Starting 'wait-for-tcp' (version: %s)", version), map[string]interface{}{
+	logMessage(output, "info", fmt.Sprintf("Starting 'waiter' (version: %s)", version), map[string]interface{}{
 		"target_name": envVars.TargetName,
 		"address":     envVars.TargetAddress,
-		"version":     version,
 	})
 
 	dialer := net.Dialer{
 		Timeout: envVars.DialTimeout,
 	}
 
-	// Run the first check immediately
-	if err := checkConnection(ctx, dialer, envVars.TargetAddress); err != nil {
-		logMessage(output, "warn", "Initial connection attempt failed ✗", map[string]interface{}{
+	for {
+		var err error
+		if err = checkConnection(ctx, dialer, envVars.TargetAddress); err == nil {
+			logMessage(output, "info", "Target became ready ✓", map[string]interface{}{
+				"target_name": envVars.TargetName,
+				"address":     envVars.TargetAddress,
+			})
+
+			return nil
+		}
+
+		logMessage(output, "warn", "Connection attempt failed ✗", map[string]interface{}{
 			"target_name": envVars.TargetName,
 			"address":     envVars.TargetAddress,
 			"error":       err.Error(),
 		})
-	} else {
-		logMessage(output, "info", "Target became ready ✓", map[string]interface{}{
-			"target_name": envVars.TargetName,
-			"address":     envVars.TargetAddress,
-		})
 
-		cancel() // Stop further checks since the target is ready
-
-		return nil
-	}
-
-	ticker := time.NewTicker(envVars.Interval)
-	defer ticker.Stop()
-
-	for {
 		select {
+		case <-time.After(envVars.Interval):
+			// Continue to the next connection attempt after the interval
 		case <-ctx.Done():
 			err := ctx.Err()
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil // Treat context cancellation or timeout as expected behavior
 			}
 			return ctx.Err()
-		case <-ticker.C:
-			if err := checkConnection(ctx, dialer, envVars.TargetAddress); err != nil {
-				logMessage(output, "warn", "Connection attempt failed ✗", map[string]interface{}{
-					"target_name": envVars.TargetName,
-					"address":     envVars.TargetAddress,
-					"error":       err.Error(),
-				})
-				continue
-			}
-
-			logMessage(output, "info", "Target became ready ✓", map[string]interface{}{
-				"target_name": envVars.TargetName,
-				"address":     envVars.TargetAddress,
-			})
-
-			cancel() // Stop further checks since the target is ready
-
-			return nil
 		}
 	}
 }
