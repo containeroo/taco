@@ -48,8 +48,76 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		if _, err := parseEnv(getenv); err == nil {
+		_, err := parseEnv(getenv)
+		if err == nil {
 			t.Error("Expected error but got none")
+		}
+
+		expected := "TARGET_NAME environment variable is required"
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Missing TARGET_ADDRESS", func(t *testing.T) {
+		env := map[string]string{
+			"TARGET_NAME": "database",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		_, err := parseEnv(getenv)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := "TARGET_ADDRESS environment variable is required"
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Invalid TARGET_ADDRESS (port)", func(t *testing.T) {
+		env := map[string]string{
+			"TARGET_NAME":    "database",
+			"TARGET_ADDRESS": "localhost",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		_, err := parseEnv(getenv)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := "invalid TARGET_ADDRESS format, must be host:port"
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Invalid TARGET_ADDRESS (schema)", func(t *testing.T) {
+		env := map[string]string{
+			"TARGET_NAME":    "database",
+			"TARGET_ADDRESS": "http://localhost:5432",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		_, err := parseEnv(getenv)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := "TARGET_ADDRESS should not include a schema (http)"
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
 	})
 
@@ -64,8 +132,14 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		if _, err := parseEnv(getenv); err == nil {
+		_, err := parseEnv(getenv)
+		if err == nil {
 			t.Error("Expected error but got none")
+		}
+
+		expected := "invalid interval value: time: invalid duration \"invalid\""
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
 	})
 
@@ -79,8 +153,14 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		if _, err := parseEnv(getenv); err == nil {
+		_, err := parseEnv(getenv)
+		if err == nil {
 			t.Error("Expected error but got none")
+		}
+
+		expected := "invalid TARGET_ADDRESS format, must be host:port"
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
 	})
 }
@@ -116,8 +196,6 @@ func TestCheckConnection(t *testing.T) {
 		err := checkConnection(ctx, dialer, targetAddress)
 		if err == nil {
 			t.Error("Expected error but got none")
-		} else {
-			fmt.Printf("Expected error occurred: %v\n", err)
 		}
 	})
 }

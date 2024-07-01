@@ -32,13 +32,22 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		DialTimeout:   2 * time.Second, // default dial timeout
 	}
 
-	if env.TargetName == "" || env.TargetAddress == "" {
-		return env, fmt.Errorf("TARGET_NAME and TARGET_ADDRESS environment variables are required")
+	if env.TargetName == "" {
+		return env, fmt.Errorf("TARGET_NAME environment variable is required")
+	}
+
+	if env.TargetAddress == "" {
+		return env, fmt.Errorf("TARGET_ADDRESS environment variable is required")
 	}
 
 	// Ensure address includes a port
 	if !strings.Contains(env.TargetAddress, ":") {
 		return env, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
+	}
+
+	// Check that the address does not include a schema
+	if schema := strings.SplitN(env.TargetAddress, "://", 2); len(schema) > 1 {
+		return env, fmt.Errorf("TARGET_ADDRESS should not include a schema (%s)", schema[0])
 	}
 
 	if intervalStr := getenv("INTERVAL"); intervalStr != "" {
