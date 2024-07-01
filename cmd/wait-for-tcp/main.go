@@ -140,7 +140,8 @@ func main() {
 
 	if err := run(ctx, os.Getenv, os.Stderr); err != nil {
 		logMessage(os.Stderr, "error", "Service check failed", map[string]interface{}{
-			"error": err.Error(),
+			"error":   err.Error(),
+			"version": version,
 		})
 		os.Exit(1)
 	}
