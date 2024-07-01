@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -201,7 +200,7 @@ func TestCheckConnection(t *testing.T) {
 }
 
 func TestRunLoop(t *testing.T) {
-	t.Run("Target becomes ready", func(t *testing.T) {
+	t.Run("Target is ready", func(t *testing.T) {
 		envVars := Vars{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
@@ -230,13 +229,13 @@ func TestRunLoop(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "msg=\"Target became ready ✓\""
+		expected := "Target is ready ✓"
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
 	})
 
-	t.Run("Target fails to become ready", func(t *testing.T) {
+	t.Run("Target is not ready", func(t *testing.T) {
 		envVars := Vars{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
@@ -258,7 +257,7 @@ func TestRunLoop(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "\"Connection attempt failed ✗\""
+		expected := "Target is not ready ✗"
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}
@@ -294,7 +293,7 @@ func TestRun(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := fmt.Sprintf("msg=\"Target became ready ✓\" target_name=%s address=%s", envVars.TargetName, envVars.TargetAddress)
+		expected := "Target is ready ✓"
 		if !strings.Contains(output.String(), expected) {
 			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
 		}

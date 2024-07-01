@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const version = "0.0.5"
+const version = "0.0.6"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -84,7 +84,7 @@ func checkConnection(ctx context.Context, dialer *net.Dialer, address string) er
 func logMessage(output io.Writer, level string, message string, details map[string]interface{}) {
 	logEntry := fmt.Sprintf("ts=%s level=%s msg=%q", time.Now().Format(time.RFC3339), level, message)
 	for k, v := range details {
-		logEntry += fmt.Sprintf(" %s=%v", k, v)
+		logEntry += fmt.Sprintf(" %s=%q", k, v)
 	}
 	fmt.Fprintln(output, logEntry)
 }
@@ -94,9 +94,9 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	logMessage(output, "info", fmt.Sprintf("Starting 'waiter' (version: %s)", version), map[string]interface{}{
-		"target_name": envVars.TargetName,
-		"address":     envVars.TargetAddress,
+	logMessage(output, "info", fmt.Sprintf("Starting 'wait-for-tcp' (version: %s)", version), map[string]interface{}{
+		"target_name":    envVars.TargetName,
+		"target_address": envVars.TargetAddress,
 	})
 
 	dialer := &net.Dialer{
@@ -106,18 +106,18 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 	for {
 		var err error
 		if err = checkConnection(ctx, dialer, envVars.TargetAddress); err == nil {
-			logMessage(output, "info", "Target became ready ✓", map[string]interface{}{
-				"target_name": envVars.TargetName,
-				"address":     envVars.TargetAddress,
+			logMessage(output, "info", "Target is ready ✓", map[string]interface{}{
+				"target_name":    envVars.TargetName,
+				"target_address": envVars.TargetAddress,
 			})
 
 			return nil
 		}
 
-		logMessage(output, "warn", "Connection attempt failed ✗", map[string]interface{}{
-			"target_name": envVars.TargetName,
-			"address":     envVars.TargetAddress,
-			"error":       fmt.Sprintf("%q", err.Error()),
+		logMessage(output, "warn", "Target is not ready ✗", map[string]interface{}{
+			"target_name":    envVars.TargetName,
+			"target_address": envVars.TargetAddress,
+			"error":          err.Error(),
 		})
 
 		select {
@@ -149,7 +149,7 @@ func main() {
 
 	if err := run(ctx, os.Getenv, os.Stderr); err != nil {
 		logMessage(os.Stderr, "error", "Service check failed", map[string]interface{}{
-			"error":   fmt.Sprintf("%q", err.Error()),
+			"error":   err.Error(),
 			"version": version,
 		})
 		os.Exit(1)
