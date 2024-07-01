@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const version = "0.0.6"
+const version = "0.0.5"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -90,11 +90,11 @@ func logMessage(output io.Writer, level string, message string, details map[stri
 }
 
 // runLoop continuously attempts to connect to the specified service until the service becomes available or the context is cancelled.
-func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
+func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	logMessage(output, "info", fmt.Sprintf("Starting 'wait-for-tcp' (version: %s)", version), map[string]interface{}{
+	logMessage(stdOut, "info", fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), map[string]interface{}{
 		"target_name":    envVars.TargetName,
 		"target_address": envVars.TargetAddress,
 	})
@@ -106,7 +106,7 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 	for {
 		var err error
 		if err = checkConnection(ctx, dialer, envVars.TargetAddress); err == nil {
-			logMessage(output, "info", "Target is ready ✓", map[string]interface{}{
+			logMessage(stdOut, "info", "Target is ready ✓", map[string]interface{}{
 				"target_name":    envVars.TargetName,
 				"target_address": envVars.TargetAddress,
 			})
@@ -114,7 +114,7 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 			return nil
 		}
 
-		logMessage(output, "warn", "Target is not ready ✗", map[string]interface{}{
+		logMessage(stdErr, "warn", "Target is not ready ✗", map[string]interface{}{
 			"target_name":    envVars.TargetName,
 			"target_address": envVars.TargetAddress,
 			"error":          err.Error(),
@@ -134,20 +134,22 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 }
 
 // run is the main entry point for running the target checker.
-func run(ctx context.Context, getenv func(string) string, output io.Writer) error {
+func run(ctx context.Context, getenv func(string) string, stdErr, stdOut io.Writer) error {
 	envVars, err := parseEnv(getenv)
 	if err != nil {
 		return err
 	}
 
-	return runLoop(ctx, envVars, output)
+	logMessage(stdOut, "info", fmt.Sprintf("wait-for-tcp version %s", version), nil)
+
+	return runLoop(ctx, envVars, stdErr, stdOut)
 }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := run(ctx, os.Getenv, os.Stderr); err != nil {
+	if err := run(ctx, os.Getenv, os.Stderr, os.Stdout); err != nil {
 		logMessage(os.Stderr, "error", "Service check failed", map[string]interface{}{
 			"error":   err.Error(),
 			"version": version,

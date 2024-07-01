@@ -217,7 +217,7 @@ func TestRunLoop(t *testing.T) {
 		}
 		defer lis.Close()
 
-		var output strings.Builder
+		var stdErr, stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -226,14 +226,17 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		err = runLoop(ctx, envVars, &output)
+		err = runLoop(ctx, envVars, &stdErr, &stdOut)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			t.Errorf("Unexpected error: %v", err)
 		}
+		if stdErr.String() != "" {
+			t.Errorf("Unexpected error: %v", stdErr.String())
+		}
 
 		expected := "Target is ready ✓"
-		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+		if !strings.Contains(stdOut.String(), expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
 
@@ -245,7 +248,7 @@ func TestRunLoop(t *testing.T) {
 			DialTimeout:   1 * time.Second,
 		}
 
-		var output strings.Builder
+		var stdErr, stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -254,14 +257,14 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		err := runLoop(ctx, envVars, &output)
+		err := runLoop(ctx, envVars, &stdErr, &stdOut)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
 		expected := "Target is not ready ✗"
-		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+		if !strings.Contains(stdErr.String(), expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
 }
@@ -282,7 +285,7 @@ func TestRun(t *testing.T) {
 		}
 		defer lis.Close()
 
-		var output strings.Builder
+		var stdErr, stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -291,13 +294,16 @@ func TestRun(t *testing.T) {
 			cancel()
 		}()
 
-		if err := runLoop(ctx, envVars, &output); err != nil {
+		if err := runLoop(ctx, envVars, &stdErr, &stdOut); err != nil {
 			t.Errorf("Unexpected error: %v", err)
+		}
+		if stdErr.String() != "" {
+			t.Errorf("Unexpected error: %v", stdErr.String())
 		}
 
 		expected := "Target is ready ✓"
-		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+		if !strings.Contains(stdOut.String(), expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
 
@@ -324,11 +330,11 @@ func TestRun(t *testing.T) {
 			time.Sleep(1 * time.Second) // Ensure runloop get a successful attemp
 		}()
 
-		var output strings.Builder
+		var stdErr, stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		if err := runLoop(ctx, envVars, &output); err != nil {
+		if err := runLoop(ctx, envVars, &stdErr, &stdOut); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -336,26 +342,31 @@ func TestRun(t *testing.T) {
 
 		defer lis.Close()
 
-		entries := strings.Split(strings.TrimSpace(output.String()), "\n")
-		if len(entries) != 5 {
-			t.Errorf("Expected output to contain '5' lines but got '%d'", len(entries))
+		stdErrEntries := strings.Split(strings.TrimSpace(stdErr.String()), "\n")
+		if len(stdErrEntries) != 3 {
+			t.Errorf("Expected output to contain '3' lines but got '%d'", len(stdErrEntries))
 		}
 
-		expected := fmt.Sprintf("Starting 'wait-for-tcp' (version: %s", version)
-		if !strings.Contains(entries[0], expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, entries[3])
+		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
+		if len(stdErrEntries) != 3 {
+			t.Errorf("Expected output to contain '3' lines but got '%d'", len(stdOutEntries))
 		}
 
-		expected = "Target is not ready ✗"
-		for i := 1; i < 3; i++ {
-			if !strings.Contains(entries[i], expected) {
-				t.Errorf("Expected output to contain %q but got %q", expected, entries[i])
-			}
+		expected := fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName)
+		if !strings.Contains(stdOutEntries[0], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[0])
 		}
 
 		expected = "Target is ready ✓"
-		if !strings.Contains(entries[4], expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, entries[3])
+		if !strings.Contains(stdOutEntries[1], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
+		}
+
+		expected = "Target is not ready ✗"
+		for i := 1; i < len(stdErrEntries); i++ {
+			if !strings.Contains(stdErrEntries[i], expected) {
+				t.Errorf("Expected output to contain %q but got %q", expected, stdErrEntries[i])
+			}
 		}
 	})
 
@@ -367,7 +378,7 @@ func TestRun(t *testing.T) {
 			DialTimeout:   1 * time.Second,
 		}
 
-		var output strings.Builder
+		var stdErr, stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -376,13 +387,13 @@ func TestRun(t *testing.T) {
 			cancel()
 		}()
 
-		if err := runLoop(ctx, envVars, &output); err != nil {
+		if err := runLoop(ctx, envVars, &stdErr, &stdOut); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
 		expected := "connect: connection refused"
-		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+		if !strings.Contains(stdErr.String(), expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdErr.String())
 		}
 	})
 }
