@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -34,7 +36,7 @@ func TestParseEnv(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if envVars != expected {
-			t.Errorf("Expected '%v', got '%v'", expected, envVars)
+			t.Errorf("Expected %q, got %q", expected, envVars)
 		}
 	})
 
@@ -231,7 +233,7 @@ func TestRunLoop(t *testing.T) {
 
 		expected := "Target is ready ✓"
 		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
+			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
 		}
 	})
 
@@ -259,7 +261,7 @@ func TestRunLoop(t *testing.T) {
 
 		expected := "Target is not ready ✗"
 		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
+			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
 		}
 	})
 }
@@ -295,7 +297,65 @@ func TestRun(t *testing.T) {
 
 		expected := "Target is ready ✓"
 		if !strings.Contains(output.String(), expected) {
-			t.Errorf("Expected output to contain '%q' but got '%q'", expected, output.String())
+			t.Errorf("Expected output to contain %q but got %q", expected, output.String())
+		}
+	})
+
+	t.Run("Successful run after 3 attempts", func(t *testing.T) {
+		envVars := Vars{
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      1 * time.Second,
+			DialTimeout:   1 * time.Second,
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		var lis net.Listener
+		go func() {
+			defer wg.Done() // Mark the WaitGroup as done when the goroutine completes
+			time.Sleep(envVars.Interval * 3)
+			var err error
+			lis, err = net.Listen("tcp", envVars.TargetAddress)
+			if err != nil {
+				panic("failed to listen: " + err.Error())
+			}
+			time.Sleep(1 * time.Second) // Ensure runloop get a successful attemp
+		}()
+
+		var output strings.Builder
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		if err := runLoop(ctx, envVars, &output); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		wg.Wait()
+
+		defer lis.Close()
+
+		entries := strings.Split(strings.TrimSpace(output.String()), "\n")
+		if len(entries) != 5 {
+			t.Errorf("Expected output to contain '5' lines but got '%d'", len(entries))
+		}
+
+		expected := fmt.Sprintf("Starting 'wait-for-tcp' (version: %s", version)
+		if !strings.Contains(entries[0], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, entries[3])
+		}
+
+		expected = "Target is not ready ✗"
+		for i := 1; i < 3; i++ {
+			if !strings.Contains(entries[i], expected) {
+				t.Errorf("Expected output to contain %q but got %q", expected, entries[i])
+			}
+		}
+
+		expected = "Target is ready ✓"
+		if !strings.Contains(entries[4], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, entries[3])
 		}
 	})
 
