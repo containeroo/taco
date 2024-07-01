@@ -108,7 +108,7 @@ func runLoop(ctx context.Context, envVars Vars, output io.Writer) error {
 		logMessage(output, "warn", "Connection attempt failed ✗", map[string]interface{}{
 			"target_name": envVars.TargetName,
 			"address":     envVars.TargetAddress,
-			"error":       err.Error(),
+			"error":       fmt.Sprintf("%q", err.Error()),
 		})
 
 		select {
@@ -140,7 +140,7 @@ func main() {
 
 	if err := run(ctx, os.Getenv, os.Stderr); err != nil {
 		logMessage(os.Stderr, "error", "Service check failed", map[string]interface{}{
-			"error":   err.Error(),
+			"error":   fmt.Sprintf("%q", err.Error()),
 			"version": version,
 		})
 		os.Exit(1)
