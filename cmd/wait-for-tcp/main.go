@@ -32,28 +32,28 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 	}
 
 	if env.TargetName == "" {
-		return env, fmt.Errorf("TARGET_NAME environment variable is required")
+		return Vars{}, fmt.Errorf("TARGET_NAME environment variable is required")
 	}
 
 	if env.TargetAddress == "" {
-		return env, fmt.Errorf("TARGET_ADDRESS environment variable is required")
+		return Vars{}, fmt.Errorf("TARGET_ADDRESS environment variable is required")
 	}
 
 	// Ensure address includes a port
 	if !strings.Contains(env.TargetAddress, ":") {
-		return env, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
+		return Vars{}, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
 	}
 
 	// Check that the address does not include a schema
 	if schema := strings.SplitN(env.TargetAddress, "://", 2); len(schema) > 1 {
-		return env, fmt.Errorf("TARGET_ADDRESS should not include a schema (%s)", schema[0])
+		return Vars{}, fmt.Errorf("TARGET_ADDRESS should not include a schema (%s)", schema[0])
 	}
 
 	if intervalStr := getenv("INTERVAL"); intervalStr != "" {
 		var err error
 		env.Interval, err = time.ParseDuration(intervalStr)
 		if err != nil {
-			return env, fmt.Errorf("invalid interval value: %s", err)
+			return Vars{}, fmt.Errorf("invalid interval value: %s", err)
 		}
 	}
 
@@ -61,7 +61,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		var err error
 		env.DialTimeout, err = time.ParseDuration(dialTimeoutStr)
 		if err != nil {
-			return env, fmt.Errorf("invalid dial timeout value: %s", err)
+			return Vars{}, fmt.Errorf("invalid dial timeout value: %s", err)
 		}
 	}
 
@@ -149,7 +149,7 @@ func main() {
 	defer cancel()
 
 	if err := run(ctx, os.Getenv, os.Stderr, os.Stdout); err != nil {
-		logMessage(os.Stderr, "error", "target check failed", map[string]interface{}{
+		logMessage(os.Stderr, "error", "Target check failed", map[string]interface{}{
 			"error":   err.Error(),
 			"version": version,
 		})

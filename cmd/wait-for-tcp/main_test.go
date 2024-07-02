@@ -419,9 +419,9 @@ func TestRunLoop(t *testing.T) {
 		}
 
 		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
-		expectedOuts := 3
-		if len(stdErrEntries) != expectedOuts {
-			t.Errorf("Expected output to contain '%d' lines but got '%d'", expectedOuts, len(stdOutEntries))
+		expectedOuts := 2
+		if len(stdOutEntries) != expectedOuts {
+			t.Errorf("Expected output to contain '%d' lines but got '%d'.", expectedOuts, len(stdOutEntries))
 		}
 
 		expected := fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName)
@@ -624,8 +624,24 @@ func TestRun(t *testing.T) {
 			t.Errorf("Unexpected error: %v", stdErr.String())
 		}
 
-		expected := "Target is ready ✓"
-		if !strings.Contains(stdOut.String(), expected) {
+		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
+		expectedOuts := 3
+		if len(stdOutEntries) != expectedOuts {
+			t.Errorf("Expected output to contain '%d' lines but got '%d'", expectedOuts, len(stdOutEntries))
+		}
+
+		expected := fmt.Sprintf("Running wait-for-tcp version %s", version)
+		if !strings.Contains(stdOutEntries[0], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
+		}
+
+		expected = "Waiting for database to become ready..."
+		if !strings.Contains(stdOutEntries[1], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
+		}
+
+		expected = "Target is ready ✓"
+		if !strings.Contains(stdOutEntries[2], expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
