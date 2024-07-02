@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,7 +12,7 @@ import (
 	"time"
 )
 
-const version = "0.0.5"
+const version = "0.0.6"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -125,10 +124,10 @@ func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error 
 			// Continue to the next connection attempt after the interval
 		case <-ctx.Done():
 			err := ctx.Err()
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return nil // Treat context cancellation or timeout as expected behavior
+			if ctx.Err() == context.Canceled {
+				return nil // Treat context cancellation as expected behavior
 			}
-			return ctx.Err()
+			return err
 		}
 	}
 }
@@ -140,7 +139,7 @@ func run(ctx context.Context, getenv func(string) string, stdErr, stdOut io.Writ
 		return err
 	}
 
-	logMessage(stdOut, "info", fmt.Sprintf("wait-for-tcp version %s", version), nil)
+	logMessage(stdOut, "info", fmt.Sprintf("Running wait-for-tcp version %s", version), nil)
 
 	return runLoop(ctx, envVars, stdErr, stdOut)
 }
@@ -150,7 +149,7 @@ func main() {
 	defer cancel()
 
 	if err := run(ctx, os.Getenv, os.Stderr, os.Stdout); err != nil {
-		logMessage(os.Stderr, "error", "Service check failed", map[string]interface{}{
+		logMessage(os.Stderr, "error", "target check failed", map[string]interface{}{
 			"error":   err.Error(),
 			"version": version,
 		})
