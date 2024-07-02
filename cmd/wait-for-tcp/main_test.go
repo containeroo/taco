@@ -265,7 +265,7 @@ func TestCheckConnection(t *testing.T) {
 	t.Run("Successful connection", func(t *testing.T) {
 		t.Parallel()
 
-		targetAddress := "127.0.0.1:5432"
+		targetAddress := "127.0.0.1:3306"
 
 		// Setup a mock server to listen on
 		lis, err := net.Listen("tcp", targetAddress)
@@ -307,7 +307,7 @@ func TestRunLoop(t *testing.T) {
 
 		envVars := Vars{
 			TargetName:    "database",
-			TargetAddress: "localhost:5432",
+			TargetAddress: "localhost:27017",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
@@ -373,55 +373,13 @@ func TestRunLoop(t *testing.T) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
-}
-
-func TestRun(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Successful run", func(t *testing.T) {
-		envVars := Vars{
-			TargetName:    "database",
-			TargetAddress: "localhost:3306",
-			Interval:      1 * time.Second,
-			DialTimeout:   1 * time.Second,
-		}
-
-		// Setup a mock server to listen on
-		lis, err := net.Listen("tcp", envVars.TargetAddress)
-		if err != nil {
-			t.Fatalf("failed to listen: %v", err)
-		}
-		defer lis.Close()
-
-		var stdErr, stdOut strings.Builder
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		// cancel runLoop after 2 Seconds
-		go func() {
-			time.Sleep(2 * time.Second)
-			cancel()
-		}()
-
-		if err := runLoop(ctx, envVars, &stdErr, &stdOut); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		if stdErr.String() != "" {
-			t.Errorf("Unexpected error: %v", stdErr.String())
-		}
-
-		expected := "Target is ready ✓"
-		if !strings.Contains(stdOut.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
-		}
-	})
 
 	t.Run("Successful run after 3 attempts", func(t *testing.T) {
 		t.Parallel()
 
 		envVars := Vars{
 			TargetName:    "database",
-			TargetAddress: "localhost:5432",
+			TargetAddress: "localhost:1433",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
@@ -489,7 +447,7 @@ func TestRun(t *testing.T) {
 
 		envVars := Vars{
 			TargetName:    "database",
-			TargetAddress: "localhost:5432",
+			TargetAddress: "localhost:1433",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
@@ -521,7 +479,7 @@ func TestRunLoopContextTimeout(t *testing.T) {
 
 		envVars := Vars{
 			TargetName:    "database",
-			TargetAddress: "localhost:5432",
+			TargetAddress: "localhost:3306",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
@@ -550,7 +508,7 @@ func TestRunLoopContextCancel(t *testing.T) {
 
 		envVars := Vars{
 			TargetName:    "database",
-			TargetAddress: "localhost:5432",
+			TargetAddress: "localhost:9042",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
@@ -583,7 +541,7 @@ func TestConcurrentConnections(t *testing.T) {
 
 	envVars := Vars{
 		TargetName:    "database",
-		TargetAddress: "localhost:5432",
+		TargetAddress: "localhost:9200",
 		Interval:      1 * time.Second,
 		DialTimeout:   1 * time.Second,
 	}
@@ -625,4 +583,103 @@ func TestConcurrentConnections(t *testing.T) {
 	if !strings.Contains(stdOut.String(), expected) {
 		t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 	}
+}
+
+func TestRun(t *testing.T) {
+	t.Run("Successful run", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"TARGET_NAME":    "database",
+			"TARGET_ADDRESS": "localhost:8091",
+			"INTERVAL":       "1s",
+			"DIAL_TIMEOUT":   "1s",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		// Setup a mock server to listen on localhost:3306
+		lis, err := net.Listen("tcp", env["TARGET_ADDRESS"])
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		defer lis.Close()
+
+		var stdErr, stdOut strings.Builder
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// cancel run after 2 Seconds
+		go func() {
+			time.Sleep(2 * time.Second)
+			cancel()
+		}()
+
+		if err := run(ctx, getenv, &stdErr, &stdOut); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if stdErr.String() != "" {
+			t.Errorf("Unexpected error: %v", stdErr.String())
+		}
+
+		expected := "Target is ready ✓"
+		if !strings.Contains(stdOut.String(), expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
+		}
+	})
+
+	t.Run("Failed run due to missing environment variable", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"TARGET_ADDRESS": "localhost:50000",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		var stdErr, stdOut strings.Builder
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := run(ctx, getenv, &stdErr, &stdOut)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := "TARGET_NAME environment variable is required"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %q but got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Failed run due to invalid address", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"TARGET_NAME":    "database",
+			"TARGET_ADDRESS": "localhost",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		var stdErr, stdOut strings.Builder
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := run(ctx, getenv, &stdErr, &stdOut)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := "invalid TARGET_ADDRESS format, must be host:port"
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("Expected error %q but got %q", expected, err.Error())
+		}
+	})
 }
