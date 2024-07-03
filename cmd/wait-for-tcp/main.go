@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const version = "0.0.6"
+const version = "0.0.7"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -28,7 +28,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		TargetName:    getenv("TARGET_NAME"),
 		TargetAddress: getenv("TARGET_ADDRESS"),
 		Interval:      2 * time.Second, // default interval
-		DialTimeout:   2 * time.Second, // default dial timeout
+		DialTimeout:   1 * time.Second, // default dial timeout
 	}
 
 	if env.TargetName == "" {
@@ -96,6 +96,9 @@ func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error 
 	logMessage(stdOut, "info", fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), map[string]interface{}{
 		"target_name":    envVars.TargetName,
 		"target_address": envVars.TargetAddress,
+		"interval":       envVars.Interval,
+		"dial_timeout":   envVars.DialTimeout,
+		"version":        version,
 	})
 
 	dialer := &net.Dialer{
@@ -108,6 +111,9 @@ func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error 
 			logMessage(stdOut, "info", "Target is ready ✓", map[string]interface{}{
 				"target_name":    envVars.TargetName,
 				"target_address": envVars.TargetAddress,
+				"interval":       envVars.Interval,
+				"dial_timeout":   envVars.DialTimeout,
+				"version":        version,
 			})
 
 			return nil
@@ -116,6 +122,9 @@ func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error 
 		logMessage(stdErr, "warn", "Target is not ready ✗", map[string]interface{}{
 			"target_name":    envVars.TargetName,
 			"target_address": envVars.TargetAddress,
+			"interval":       envVars.Interval,
+			"dial_timeout":   envVars.DialTimeout,
+			"version":        version,
 			"error":          err.Error(),
 		})
 
@@ -139,7 +148,13 @@ func run(ctx context.Context, getenv func(string) string, stdErr, stdOut io.Writ
 		return err
 	}
 
-	logMessage(stdOut, "info", fmt.Sprintf("Running wait-for-tcp version %s", version), nil)
+	logMessage(stdOut, "info", "Starting wait-for-tcp", map[string]interface{}{
+		"target_name":    envVars.TargetName,
+		"target_address": envVars.TargetAddress,
+		"interval":       envVars.Interval,
+		"dial_timeout":   envVars.DialTimeout,
+		"version":        version,
+	})
 
 	return runLoop(ctx, envVars, stdErr, stdOut)
 }

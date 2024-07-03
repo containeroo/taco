@@ -630,7 +630,7 @@ func TestRun(t *testing.T) {
 			t.Errorf("Expected output to contain '%d' lines but got '%d'", expectedOuts, len(stdOutEntries))
 		}
 
-		expected := fmt.Sprintf("Running wait-for-tcp version %s", version)
+		expected := "Starting wait-for-tcp"
 		if !strings.Contains(stdOutEntries[0], expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
