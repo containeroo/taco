@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const version = "0.0.7"
+const version = "0.0.8"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -147,14 +147,6 @@ func run(ctx context.Context, getenv func(string) string, stdErr, stdOut io.Writ
 	if err != nil {
 		return err
 	}
-
-	logMessage(stdOut, "info", "Starting wait-for-tcp", map[string]interface{}{
-		"target_name":    envVars.TargetName,
-		"target_address": envVars.TargetAddress,
-		"interval":       envVars.Interval,
-		"dial_timeout":   envVars.DialTimeout,
-		"version":        version,
-	})
 
 	return runLoop(ctx, envVars, stdErr, stdOut)
 }
