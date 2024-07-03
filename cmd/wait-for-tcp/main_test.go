@@ -25,16 +25,16 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
+		envVars, err := parseEnv(getenv)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
 		expected := Vars{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
-		}
-
-		envVars, err := parseEnv(getenv)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
 		}
 		if envVars != expected {
 			t.Errorf("Expected %q, got %q", expected, envVars)
@@ -191,16 +191,16 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
+		envVars, err := parseEnv(getenv)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
 		expected := Vars{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			Interval:      10000 * time.Hour,
 			DialTimeout:   10000 * time.Hour,
-		}
-
-		envVars, err := parseEnv(getenv)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
 		}
 		if envVars != expected {
 			t.Errorf("Expected %q, got %q", expected, envVars)
@@ -235,6 +235,7 @@ func TestParseEnv(t *testing.T) {
 			t.Errorf("Expected %q, got %q", expected, envVars)
 		}
 	})
+
 	t.Run("Invalid DIAL_TIMEOUT", func(t *testing.T) {
 		t.Parallel()
 

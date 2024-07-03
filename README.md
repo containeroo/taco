@@ -24,7 +24,6 @@ The application requires the following environment variables to be set:
 The application uses structured logging to provide clear and consistent log messages. Logs are output in a key-value format with timestamps and log levels.
 
 ```
-ts=2024-07-03T13:32:20+02:00 level=info msg="Starting wait-for-tcp" interval="2s" dial_timeout="1s" version="0.0.6" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432"
 ts=2024-07-03T13:32:20+02:00 level=info msg="Waiting for PostgreSQL to become ready..." target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s" dial_timeout="1s" version="0.0.6"
 ts=2024-07-03T13:32:21+02:00 level=warn msg="Target is not ready ✗" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s" dial_timeout="1s" version="0.0.6" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout"
 ts=2024-07-03T13:32:24+02:00 level=warn msg="Target is not ready ✗" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s" dial_timeout="1s" version="0.0.6" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout"

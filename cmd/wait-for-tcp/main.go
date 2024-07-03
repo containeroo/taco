@@ -39,14 +39,12 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		return Vars{}, fmt.Errorf("TARGET_ADDRESS environment variable is required")
 	}
 
-	// Ensure address includes a port
-	if !strings.Contains(env.TargetAddress, ":") {
-		return Vars{}, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
-	}
-
-	// Check that the address does not include a schema
 	if schema := strings.SplitN(env.TargetAddress, "://", 2); len(schema) > 1 {
 		return Vars{}, fmt.Errorf("TARGET_ADDRESS should not include a schema (%s)", schema[0])
+	}
+
+	if !strings.Contains(env.TargetAddress, ":") {
+		return Vars{}, fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
 	}
 
 	if intervalStr := getenv("INTERVAL"); intervalStr != "" {
