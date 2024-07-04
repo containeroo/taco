@@ -39,4 +39,4 @@ docker_manifests:
   - name_template: ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
     image_templates:
       - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}-amd64
-      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag }v" }}-arm64v8
+      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}-arm64v8
