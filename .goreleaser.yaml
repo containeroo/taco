@@ -23,6 +23,8 @@ dockers:
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/amd64"
+    extra_files:
+      - cmd
   - image_templates:
       - "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-arm64v8"
     use: buildx
@@ -30,6 +32,8 @@ dockers:
     dockerfile: Dockerfile
     build_flag_templates:
       - "--platform=linux/arm64/v8"
+    extra_files:
+      - cmd
 docker_manifests:
   - name_template: "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}"
     image_templates:
