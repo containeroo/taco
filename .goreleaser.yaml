@@ -17,7 +17,7 @@ builds:
       - arm64
 dockers:
   - image_templates:
-      - "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-amd64"
+      - ghcr.io/containeroo/wait-for-tcp:{{ timprefix .Tag "v" }}-amd64
     use: buildx
     dockerfile: Dockerfile
     build_flag_templates:
@@ -26,7 +26,7 @@ dockers:
       - go.mod
       - cmd
   - image_templates:
-      - "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-arm64v8"
+      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix.Tag "v" }}-arm64v8
     use: buildx
     goarch: arm64
     dockerfile: Dockerfile
@@ -36,7 +36,7 @@ dockers:
       - go.mod
       - cmd
 docker_manifests:
-  - name_template: "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}"
+  - name_template: ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
     image_templates:
-      - "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-amd64"
-      - "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-arm64v8"
+      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}-amd64
+      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag }v" }}-arm64v8
