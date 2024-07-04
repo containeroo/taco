@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const version = "0.0.12"
+const version = "0.0.13"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -23,15 +23,9 @@ type Vars struct {
 }
 
 // logMessage logs a message in structured key-value pairs format.
-func logMessage(output io.Writer, level string, message string, fields map[string]string) {
-	var logEntry strings.Builder
-	logEntry.WriteString(fmt.Sprintf("ts=%s level=%s msg=%q", time.Now().Format(time.RFC3339), level, message))
-
-	for k, v := range fields {
-		logEntry.WriteString(fmt.Sprintf(" %s=%q", k, v))
-	}
-
-	fmt.Fprintln(output, logEntry.String())
+func logMessage(output io.Writer, level string, message string, fields string) {
+	logEntry := fmt.Sprintf("ts=%s level=%s msg=%q %s", time.Now().Format(time.RFC3339), level, message, fields)
+	fmt.Fprintln(output, logEntry)
 }
 
 // parseEnv retrieves and validates the environment variables required for the target checker.
@@ -94,15 +88,9 @@ func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error 
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	fields := map[string]string{
-		"target_name":    envVars.TargetName,
-		"target_address": envVars.TargetAddress,
-		"interval":       envVars.Interval.String(),
-		"dial_timeout":   envVars.DialTimeout.String(),
-		"version":        version,
-	}
+	baseFields := fmt.Sprintf("target_name=%q target_address=%q interval=%q dial_timeout=%q version=%q", envVars.TargetName, envVars.TargetAddress, envVars.Interval.String(), envVars.DialTimeout.String(), version)
 
-	logMessage(stdOut, "info", fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), fields)
+	logMessage(stdOut, "info", fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), baseFields)
 
 	dialer := &net.Dialer{
 		Timeout: envVars.DialTimeout,
@@ -111,13 +99,12 @@ func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error 
 	for {
 		err := checkConnection(ctx, dialer, envVars.TargetAddress)
 		if err == nil {
-			delete(fields, "error") // remove posible errors from before
-			logMessage(stdOut, "info", "Target is ready ✓", fields)
+			logMessage(stdOut, "info", "Target is ready ✓", baseFields)
 			return nil
 		}
 
-		fields["error"] = err.Error()
-		logMessage(stdErr, "warn", "Target is not ready ✗", fields)
+		errorFields := fmt.Sprintf("%s error=%q", baseFields, err.Error())
+		logMessage(stdErr, "warn", "Target is not ready ✗", errorFields)
 
 		select {
 		case <-time.After(envVars.Interval):
