@@ -13,7 +13,7 @@ builds:
       - amd64
 dockers:
   - image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-amd64
+      - ghcr.io/containeroo/wait-for-tcp:{{ (trimPrefix "v" .Tag) }}
     use: buildx
     dockerfile: Dockerfile
     extra_files:
@@ -26,15 +26,14 @@ dockers:
       - --label=org.opencontainers.image.description={{ .ProjectName }}
       - --label=org.opencontainers.image.url=https://github.com/containeroo/wait-for-tcp
       - --label=org.opencontainers.image.source=https://github.com/containeroo/wait-for-tcp
-      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.version={{ (trimPrefix "v" .Version) }}
       - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
       - --label=org.opencontainers.image.revision={{ .FullCommit }}
       - --label=org.opencontainers.image.licenses="GNU General Public License v3.0"
 docker_manifests:
-  - name_template: ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}
+  - name_template: ghcr.io/containeroo/wait-for-tcp:{{ (trimPrefix "v" .Tag) }}
     image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-amd64
+      - ghcr.io/containeroo/wait-for-tcp:{{ (trimPrefix "v" .Tag) }}
   - name_template: ghcr.io/containeroo/wait-for-tcp:latest
     image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-amd64
-
+      - ghcr.io/containeroo/wait-for-tcp:{{ (trimPrefix "v" .Tag) }}
