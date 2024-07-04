@@ -12,12 +12,9 @@ builds:
     goos:
       - linux
 dockers:
-  - id: wait-for-tcp
+  - id: ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
     goos: linux
     goarch: amd64
-    goamd64: "v2"
-    ids:
-      - wait-for-tcp
     image_templates:
       - ghcr.io/containeroo/wait-for-tcp:latest
       - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
