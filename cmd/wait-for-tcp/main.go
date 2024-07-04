@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const version = "0.0.10"
+const version = "0.0.11"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -20,6 +20,18 @@ type Vars struct {
 	TargetAddress string        // The address of the target in the format 'host:port'.
 	Interval      time.Duration // The interval between connection attempts.
 	DialTimeout   time.Duration // The timeout for each connection attempt.
+}
+
+// logMessage logs a message in structured key-value pairs format.
+func logMessage(output io.Writer, level string, message string, fields map[string]string) {
+	var logEntry strings.Builder
+	logEntry.WriteString(fmt.Sprintf("ts=%s level=%s msg=%q", time.Now().Format(time.RFC3339), level, message))
+
+	for k, v := range fields {
+		logEntry.WriteString(fmt.Sprintf(" %s=%q", k, v))
+	}
+
+	fmt.Fprintln(output, logEntry.String())
 }
 
 // parseEnv retrieves and validates the environment variables required for the target checker.
@@ -77,54 +89,35 @@ func checkConnection(ctx context.Context, dialer *net.Dialer, address string) er
 	return nil
 }
 
-// logMessage logs a message in structured key-value pairs format.
-func logMessage(output io.Writer, level string, message string, details map[string]interface{}) {
-	logEntry := fmt.Sprintf("ts=%s level=%s msg=%q", time.Now().Format(time.RFC3339), level, message)
-	for k, v := range details {
-		logEntry += fmt.Sprintf(" %s=%q", k, v)
-	}
-	fmt.Fprintln(output, logEntry)
-}
-
 // runLoop continuously attempts to connect to the specified service until the service becomes available or the context is cancelled.
 func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	logMessage(stdOut, "info", fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), map[string]interface{}{
+	fields := map[string]string{
 		"target_name":    envVars.TargetName,
 		"target_address": envVars.TargetAddress,
-		"interval":       envVars.Interval,
-		"dial_timeout":   envVars.DialTimeout,
+		"interval":       envVars.Interval.String(),
+		"dial_timeout":   envVars.DialTimeout.String(),
 		"version":        version,
-	})
+	}
+
+	logMessage(stdOut, "info", fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), fields)
 
 	dialer := &net.Dialer{
 		Timeout: envVars.DialTimeout,
 	}
 
 	for {
-		var err error
-		if err = checkConnection(ctx, dialer, envVars.TargetAddress); err == nil {
-			logMessage(stdOut, "info", "Target is ready ✓", map[string]interface{}{
-				"target_name":    envVars.TargetName,
-				"target_address": envVars.TargetAddress,
-				"interval":       envVars.Interval,
-				"dial_timeout":   envVars.DialTimeout,
-				"version":        version,
-			})
-
+		err := checkConnection(ctx, dialer, envVars.TargetAddress)
+		if err == nil {
+			delete(fields, "error") // remove posible errors from before
+			logMessage(stdOut, "info", "Target is ready ✓", fields)
 			return nil
 		}
 
-		logMessage(stdErr, "warn", "Target is not ready ✗", map[string]interface{}{
-			"target_name":    envVars.TargetName,
-			"target_address": envVars.TargetAddress,
-			"interval":       envVars.Interval,
-			"dial_timeout":   envVars.DialTimeout,
-			"version":        version,
-			"error":          err.Error(),
-		})
+		fields["error"] = err.Error()
+		logMessage(stdErr, "warn", "Target is not ready ✗", fields)
 
 		select {
 		case <-time.After(envVars.Interval):
@@ -154,10 +147,7 @@ func main() {
 	defer cancel()
 
 	if err := run(ctx, os.Getenv, os.Stderr, os.Stdout); err != nil {
-		logMessage(os.Stderr, "error", "Target check failed", map[string]interface{}{
-			"error":   err.Error(),
-			"version": version,
-		})
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
 }

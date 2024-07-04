@@ -1,24 +1,27 @@
----
 project_name: wait-for-tcp
+version: 2
+
 before:
   hooks:
     - go mod tidy
+
 builds:
   - main: ./cmd/wait-for-tcp/main.go
-    env:
+  - env:
       - CGO_ENABLED=0
     goos:
       - linux
-    goarch:
-      - amd64
 dockers:
-  - image_templates:
+  - id: wait-for-tcp
+    goos: linux
+    goarch: amd64
+    goamd64: "v2"
+    ids:
+      - wait-for-tcp
+    image_templates:
+      - ghcr.io/containeroo/wait-for-tcp:latest
       - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
     use: buildx
-    dockerfile: Dockerfile
-    extra_files:
-      - go.mod
-      - cmd
     build_flag_templates:
       - --pull
       - --platform=linux/amd64
@@ -30,10 +33,6 @@ dockers:
       - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
       - --label=org.opencontainers.image.revision={{ .FullCommit }}
       - --label=org.opencontainers.image.licenses="GNU General Public License v3.0"
-docker_manifests:
-  - name_template: ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
-    image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
-  - name_template: ghcr.io/containeroo/wait-for-tcp:latest
-    image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
+    extra_files:
+      - go.mod
+      - cmd
