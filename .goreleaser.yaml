@@ -10,7 +10,6 @@ builds:
     main: ./cmd/wait-for-tcp/main.go
     env:
       - CGO_ENABLED=0
-    binary: mybin
     goos:
       - linux
     goarch:
