@@ -23,6 +23,7 @@ dockers:
     build_flag_templates:
       - "--platform=linux/amd64"
     extra_files:
+      - go.mod
       - cmd
   - image_templates:
       - "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}-arm64v8"
@@ -32,6 +33,7 @@ dockers:
     build_flag_templates:
       - "--platform=linux/arm64/v8"
     extra_files:
+      - go.mod
       - cmd
 docker_manifests:
   - name_template: "ghcr.io/containeroo/wait-for-tcp:{{ .Tag }}"
