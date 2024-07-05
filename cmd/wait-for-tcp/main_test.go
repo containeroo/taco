@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,7 @@ func TestParseEnv(t *testing.T) {
 			"TARGET_ADDRESS": "localhost:5432",
 			"INTERVAL":       "1s",
 			"DIAL_TIMEOUT":   "1s",
+			"VERBOSE":        "true",
 		}
 
 		getenv := func(key string) string {
@@ -35,9 +37,10 @@ func TestParseEnv(t *testing.T) {
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
+			Verbose:       true,
 		}
-		if envVars != expected {
-			t.Errorf("Expected %q, got %q", expected, envVars)
+		if !reflect.DeepEqual(envVars, expected) {
+			t.Errorf("Expected %+v, got %+v", expected, envVars)
 		}
 	})
 
@@ -149,7 +152,7 @@ func TestParseEnv(t *testing.T) {
 			t.Error("Expected error but got none")
 		}
 
-		expected := "invalid interval value: time: invalid duration \"invalid\""
+		expected := "invalid INTERVAL value: time: invalid duration \"invalid\""
 		if err.Error() != expected {
 			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
@@ -177,6 +180,7 @@ func TestParseEnv(t *testing.T) {
 			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
 	})
+
 	t.Run("Extremely high INTERVAL and DIAL_TIMEOUT", func(t *testing.T) {
 		t.Parallel()
 
@@ -201,11 +205,13 @@ func TestParseEnv(t *testing.T) {
 			TargetAddress: "localhost:5432",
 			Interval:      10000 * time.Hour,
 			DialTimeout:   10000 * time.Hour,
+			Verbose:       false,
 		}
-		if envVars != expected {
-			t.Errorf("Expected %q, got %q", expected, envVars)
+		if !reflect.DeepEqual(envVars, expected) {
+			t.Errorf("Expected %+v, got %+v", expected, envVars)
 		}
 	})
+
 	t.Run("Extremely low INTERVAL and DIAL_TIMEOUT", func(t *testing.T) {
 		t.Parallel()
 
@@ -230,9 +236,10 @@ func TestParseEnv(t *testing.T) {
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Millisecond,
 			DialTimeout:   1 * time.Millisecond,
+			Verbose:       false,
 		}
-		if envVars != expected {
-			t.Errorf("Expected %q, got %q", expected, envVars)
+		if !reflect.DeepEqual(envVars, expected) {
+			t.Errorf("Expected %+v, got %+v", expected, envVars)
 		}
 	})
 
@@ -254,7 +261,7 @@ func TestParseEnv(t *testing.T) {
 			t.Error("Expected error but got none")
 		}
 
-		expected := "invalid dial timeout value: time: invalid duration \"invalid\""
+		expected := "invalid DIAL_TIMEOUT value: time: invalid duration \"invalid\""
 		if err.Error() != expected {
 			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
@@ -301,6 +308,76 @@ func TestCheckConnection(t *testing.T) {
 	})
 }
 
+func TestSimpleLogger(t *testing.T) {
+	t.Run("Info logs message with fields", func(t *testing.T) {
+		t.Parallel()
+
+		var output strings.Builder
+		logger := NewSimpleLogger(&output, &output)
+		logger.SetVerbose(true)
+
+		fields := map[string]string{
+			"field1": "value1",
+			"field2": "value2",
+		}
+
+		logger.Info("Test info message", fields)
+		logEntry := output.String()
+		expected := "level=info msg=\"Test info message\" field1=\"value1\" field2=\"value2\""
+
+		if !strings.Contains(logEntry, expected) {
+			t.Errorf("Expected log entry to contain %q but got %q", expected, logEntry)
+		}
+	})
+
+	t.Run("Warn logs message with fields", func(t *testing.T) {
+		t.Parallel()
+
+		var output strings.Builder
+		logger := NewSimpleLogger(&output, &output)
+		logger.SetVerbose(true)
+
+		fields := map[string]string{
+			"field1": "value1",
+			"field2": "value2",
+		}
+
+		logger.Warn("Test warn message", fields)
+		logEntry := output.String()
+		expected := "level=warn msg=\"Test warn message\" field1=\"value1\" field2=\"value2\""
+
+		if !strings.Contains(logEntry, expected) {
+			t.Errorf("Expected log entry to contain %q but got %q", expected, logEntry)
+		}
+	})
+
+	t.Run("Info logs message without fields when verbose is false", func(t *testing.T) {
+		t.Parallel()
+
+		var output strings.Builder
+		logger := NewSimpleLogger(&output, &output)
+		logger.SetVerbose(false)
+
+		fields := map[string]string{
+			"field1": "value1",
+			"field2": "value2",
+		}
+
+		logger.Info("Test info message", fields)
+		logEntry := output.String()
+		expected := "level=info msg=\"Test info message\""
+
+		if !strings.Contains(logEntry, expected) {
+			t.Errorf("Expected log entry to contain %q but got %q", expected, logEntry)
+		}
+
+		unexpected := "field1=\"value1\""
+		if strings.Contains(logEntry, unexpected) {
+			t.Errorf("Did not expect log entry to contain %q but it did", unexpected)
+		}
+	})
+}
+
 func TestRunLoop(t *testing.T) {
 	t.Run("Target is ready", func(t *testing.T) {
 		t.Parallel()
@@ -323,13 +400,16 @@ func TestRunLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		logger := NewSimpleLogger(&stdOut, &stdErr)
+		logger.SetVerbose(true)
+
 		// cancel runLoop after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		err = runLoop(ctx, envVars, &stdErr, &stdOut)
+		err = runLoop(ctx, envVars, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -357,20 +437,23 @@ func TestRunLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		logger := NewSimpleLogger(&stdOut, &stdErr)
+		logger.SetVerbose(true)
+
 		// cancel runLoop after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		err := runLoop(ctx, envVars, &stdErr, &stdOut)
+		err := runLoop(ctx, envVars, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
 		expected := "Target is not ready ✗"
 		if !strings.Contains(stdErr.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
+			t.Errorf("Expected output to contain %q but got %q", expected, stdErr.String())
 		}
 	})
 
@@ -404,7 +487,10 @@ func TestRunLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		if err := runLoop(ctx, envVars, &stdErr, &stdOut); err != nil {
+		logger := NewSimpleLogger(&stdOut, &stdErr)
+		logger.SetVerbose(true)
+
+		if err := runLoop(ctx, envVars, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -458,13 +544,16 @@ func TestRunLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		logger := NewSimpleLogger(&stdOut, &stdErr)
+		logger.SetVerbose(true)
+
 		// cancel runLoop after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		if err := runLoop(ctx, envVars, &stdErr, &stdOut); err != nil {
+		if err := runLoop(ctx, envVars, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -488,7 +577,10 @@ func TestRunLoop(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		err := runLoop(ctx, envVars, &stdErr, &stdOut)
+		logger := NewSimpleLogger(&stdOut, &stdErr)
+		logger.SetVerbose(true)
+
+		err := runLoop(ctx, envVars, logger)
 		if err != nil && err != context.DeadlineExceeded {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -496,6 +588,7 @@ func TestRunLoop(t *testing.T) {
 		expected := "context deadline exceeded"
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error %q but got %q", expected, err.Error())
+			fmt.Println(stdErr.String())
 		}
 	})
 
@@ -512,13 +605,16 @@ func TestRunLoop(t *testing.T) {
 		var stdErr, stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 
+		logger := NewSimpleLogger(&stdOut, &stdErr)
+		logger.SetVerbose(true)
+
 		// cancel runLoop after 1 Seconds
 		go func() {
 			time.Sleep(1 * time.Second)
 			cancel()
 		}()
 
-		err := runLoop(ctx, envVars, &stdErr, &stdOut)
+		err := runLoop(ctx, envVars, logger)
 		// runLoop returns nil if context is canceled
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -547,6 +643,9 @@ func TestConcurrentConnections(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	logger := NewSimpleLogger(&stdOut, &stdErr)
+	logger.SetVerbose(true)
+
 	var wg sync.WaitGroup
 	numRoutines := 5
 	wg.Add(numRoutines)
@@ -554,7 +653,7 @@ func TestConcurrentConnections(t *testing.T) {
 	for i := 0; i < numRoutines; i++ {
 		go func() {
 			defer wg.Done()
-			err := runLoop(ctx, envVars, &stdErr, &stdOut)
+			err := runLoop(ctx, envVars, logger)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -584,6 +683,7 @@ func TestRun(t *testing.T) {
 			"TARGET_ADDRESS": "localhost:8091",
 			"INTERVAL":       "1s",
 			"DIAL_TIMEOUT":   "1s",
+			"VERBOSE":        "true",
 		}
 
 		getenv := func(key string) string {

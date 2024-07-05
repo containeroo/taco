@@ -7,12 +7,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 )
 
-const version = "0.0.13"
+const version = "0.0.14"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -20,12 +22,62 @@ type Vars struct {
 	TargetAddress string        // The address of the target in the format 'host:port'.
 	Interval      time.Duration // The interval between connection attempts.
 	DialTimeout   time.Duration // The timeout for each connection attempt.
+	Verbose       bool          // Enable verbose logging
+}
+
+// Logger interface for structured logging
+type Logger interface {
+	Info(message string, fields map[string]string)
+	Warn(message string, fields map[string]string)
+	SetVerbose(verbose bool)
+}
+
+// SimpleLogger is a basic implementation of the Logger interface
+type SimpleLogger struct {
+	infoOutput  io.Writer
+	errorOutput io.Writer
+	verbose     bool
+}
+
+// NewSimpleLogger creates a new SimpleLogger instance
+func NewSimpleLogger(infoOutput, errorOutput io.Writer) *SimpleLogger {
+	return &SimpleLogger{
+		infoOutput:  infoOutput,
+		errorOutput: errorOutput,
+		verbose:     false,
+	}
+}
+
+// SetVerbose sets the logging verbosity
+func (l *SimpleLogger) SetVerbose(verbose bool) {
+	l.verbose = verbose
 }
 
 // logMessage logs a message in structured key-value pairs format.
-func logMessage(output io.Writer, level string, message string, fields string) {
-	logEntry := fmt.Sprintf("ts=%s level=%s msg=%q %s", time.Now().Format(time.RFC3339), level, message, fields)
-	fmt.Fprintln(output, logEntry)
+func (l *SimpleLogger) logMessage(output io.Writer, level string, message string, fields map[string]string) {
+	var logEntry strings.Builder
+	logEntry.WriteString(fmt.Sprintf("ts=%s level=%s msg=%q", time.Now().Format(time.RFC3339), level, message))
+	if l.verbose {
+		keys := make([]string, 0, len(fields))
+		for k := range fields {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			logEntry.WriteString(fmt.Sprintf(" %s=%q", k, fields[k]))
+		}
+	}
+	fmt.Fprintln(output, logEntry.String())
+}
+
+// Info logs an info message
+func (l *SimpleLogger) Info(message string, fields map[string]string) {
+	l.logMessage(l.infoOutput, "info", message, fields)
+}
+
+// Warn logs a warning message
+func (l *SimpleLogger) Warn(message string, fields map[string]string) {
+	l.logMessage(l.errorOutput, "warn", message, fields)
 }
 
 // parseEnv retrieves and validates the environment variables required for the target checker.
@@ -35,6 +87,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		TargetAddress: getenv("TARGET_ADDRESS"),
 		Interval:      2 * time.Second, // default interval
 		DialTimeout:   1 * time.Second, // default dial timeout
+		Verbose:       false,
 	}
 
 	if env.TargetName == "" {
@@ -57,7 +110,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		var err error
 		env.Interval, err = time.ParseDuration(intervalStr)
 		if err != nil {
-			return Vars{}, fmt.Errorf("invalid interval value: %s", err)
+			return Vars{}, fmt.Errorf("invalid INTERVAL value: %s", err)
 		}
 	}
 
@@ -65,7 +118,15 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		var err error
 		env.DialTimeout, err = time.ParseDuration(dialTimeoutStr)
 		if err != nil {
-			return Vars{}, fmt.Errorf("invalid dial timeout value: %s", err)
+			return Vars{}, fmt.Errorf("invalid DIAL_TIMEOUT value: %s", err)
+		}
+	}
+
+	if verboseStr := getenv("VERBOSE"); verboseStr != "" {
+		var err error
+		env.Verbose, err = strconv.ParseBool(verboseStr)
+		if err != nil {
+			return Vars{}, fmt.Errorf("invalid VERBOSE value: %s", err)
 		}
 	}
 
@@ -84,13 +145,19 @@ func checkConnection(ctx context.Context, dialer *net.Dialer, address string) er
 }
 
 // runLoop continuously attempts to connect to the specified service until the service becomes available or the context is cancelled.
-func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error {
+func runLoop(ctx context.Context, envVars Vars, logger Logger) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	baseFields := fmt.Sprintf("target_name=%q target_address=%q interval=%q dial_timeout=%q version=%q", envVars.TargetName, envVars.TargetAddress, envVars.Interval.String(), envVars.DialTimeout.String(), version)
+	fields := map[string]string{
+		"target_name":    envVars.TargetName,
+		"target_address": envVars.TargetAddress,
+		"interval":       envVars.Interval.String(),
+		"dial_timeout":   envVars.DialTimeout.String(),
+		"version":        version,
+	}
 
-	logMessage(stdOut, "info", fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), baseFields)
+	logger.Info(fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), fields)
 
 	dialer := &net.Dialer{
 		Timeout: envVars.DialTimeout,
@@ -99,12 +166,13 @@ func runLoop(ctx context.Context, envVars Vars, stdErr, stdOut io.Writer) error 
 	for {
 		err := checkConnection(ctx, dialer, envVars.TargetAddress)
 		if err == nil {
-			logMessage(stdOut, "info", "Target is ready ✓", baseFields)
+			delete(fields, "error")
+			logger.Info("Target is ready ✓", fields)
 			return nil
 		}
 
-		errorFields := fmt.Sprintf("%s error=%q", baseFields, err.Error())
-		logMessage(stdErr, "warn", "Target is not ready ✗", errorFields)
+		fields["error"] = err.Error()
+		logger.Warn("Target is not ready ✗", fields)
 
 		select {
 		case <-time.After(envVars.Interval):
@@ -126,7 +194,10 @@ func run(ctx context.Context, getenv func(string) string, stdErr, stdOut io.Writ
 		return err
 	}
 
-	return runLoop(ctx, envVars, stdErr, stdOut)
+	logger := NewSimpleLogger(stdOut, stdErr)
+	logger.SetVerbose(envVars.Verbose)
+
+	return runLoop(ctx, envVars, logger)
 }
 
 func main() {

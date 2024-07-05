@@ -10,6 +10,7 @@ The application requires the following environment variables to be set:
 - `TARGET_ADDRESS`: The address of the target in the format `host:port`.
 - `INTERVAL`: The interval between connection attempts (optional, default: `2s`).
 - `DIAL_TIMEOUT`: The timeout for each connection attempt (optional, default: `1s`).
+- `VERBOSE`: Enable verbose logging (optional, default: `false`). Set to `true` to include additional log details.
 
 ## Behavior
 
@@ -24,12 +25,11 @@ The application requires the following environment variables to be set:
 The application uses structured logging to provide clear and consistent log messages. Logs are output in a key-value format with timestamps and log levels.
 
 ```
-ts=2024-07-03T13:32:20+02:00 level=info msg="Waiting for PostgreSQL to become ready..." target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s" dial_timeout="1s" version="0.0.6"
-ts=2024-07-03T13:32:21+02:00 level=warn msg="Target is not ready ✗" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s" dial_timeout="1s" version="0.0.6" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout"
-ts=2024-07-03T13:32:24+02:00 level=warn msg="Target is not ready ✗" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s" dial_timeout="1s" version="0.0.6" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout"
-ts=2024-07-03T13:32:27+02:00 level=warn msg="Target is not ready ✗" dial_timeout="1s" version="0.0.6" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s"
-ts=2024-07-03T13:32:30+02:00 level=warn msg="Target is not ready ✗" version="0.0.6" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432" interval="2s" dial_timeout="1s"
-ts=2024-07-03T13:33:30+02:00 level=info msg="Target is ready ✓" target_name="PostgreSQL" target_address="postgres.default.svc.cluster.local:5432"
+ts=2024-07-05T13:08:20+02:00 level=info msg="Waiting for PostgreSQL to become ready..." dial_timeout="1s" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
+ts=2024-07-05T13:08:21+02:00 level=warn msg="Target is not ready ✗" dial_timeout="1s" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
+ts=2024-07-05T13:08:24+02:00 level=warn msg="Target is not ready ✗" dial_timeout="1s" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
+ts=2024-07-05T13:08:27+02:00 level=warn msg="Target is not ready ✗" dial_timeout="1s" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
+ts=2024-07-05T13:08:30+02:00 level=info msg="Target is ready ✓" dial_timeout="1s" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
 ```
 
 ## Kubernetes Init Container Configuration
@@ -39,7 +39,7 @@ Configure your Kubernetes deployment to use this init container:
 ```yaml
 initContainers:
   - name: wait-for-response
-    image: containeroo/wait-for-response:latest
+    image: containeroo/wait-for-tcp:latest
     env:
       - name: TARGET_NAME
         value: "PostgreSQL"
@@ -49,4 +49,6 @@ initContainers:
         value: "2s" # Specify the interval duration, e.g., 2 seconds
       - name: DIAL_TIMEOUT
         value: "2s" # Specify the dial timeout duration, e.g., 2 seconds
+      - name: VERBOSE
+        value: "true"
 ```
