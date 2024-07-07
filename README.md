@@ -10,7 +10,7 @@ The application requires the following environment variables to be set:
 - `TARGET_ADDRESS`: The address of the target in the format `host:port`.
 - `INTERVAL`: The interval between connection attempts (optional, default: `2s`).
 - `DIAL_TIMEOUT`: The timeout for each connection attempt (optional, default: `1s`).
-- `VERBOSE`: Enable verbose logging (optional, default: `false`). Set to `true` to include additional log details.
+- `LOG_FIELDS`: Log additional fields (optional, default: `false`). Set to `true` to include additional log details.
 
 ## Behavior
 
@@ -49,6 +49,6 @@ initContainers:
         value: "2s" # Specify the interval duration, e.g., 2 seconds
       - name: DIAL_TIMEOUT
         value: "2s" # Specify the dial timeout duration, e.g., 2 seconds
-      - name: VERBOSE
+      - name: LOG_FIELDS
         value: "true"
 ```

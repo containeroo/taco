@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.14"
+const version = "0.0.15"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -22,21 +22,31 @@ type Vars struct {
 	TargetAddress string        // The address of the target in the format 'host:port'.
 	Interval      time.Duration // The interval between connection attempts.
 	DialTimeout   time.Duration // The timeout for each connection attempt.
-	Verbose       bool          // Enable verbose logging
+	LogFields     bool          // Logs additional fields
 }
+
+// Fields represents a map of fields for structured logging
+type Fields map[string]interface{}
 
 // Logger interface for structured logging
 type Logger interface {
-	Info(message string, fields map[string]string)
-	Warn(message string, fields map[string]string)
-	SetVerbose(verbose bool)
+	Infof(message string, args ...interface{})
+	Warnf(message string, args ...interface{})
+	WithFields(fields Fields) *LoggerEntry
+	LogFields(enable bool)
+}
+
+// LoggerEntry represents a log entry with its fields
+type LoggerEntry struct {
+	logger *SimpleLogger
+	fields Fields
 }
 
 // SimpleLogger is a basic implementation of the Logger interface
 type SimpleLogger struct {
 	infoOutput  io.Writer
 	errorOutput io.Writer
-	verbose     bool
+	logFields   bool
 }
 
 // NewSimpleLogger creates a new SimpleLogger instance
@@ -44,40 +54,69 @@ func NewSimpleLogger(infoOutput, errorOutput io.Writer) *SimpleLogger {
 	return &SimpleLogger{
 		infoOutput:  infoOutput,
 		errorOutput: errorOutput,
-		verbose:     false,
+		logFields:   false,
 	}
 }
 
-// SetVerbose sets the logging verbosity
-func (l *SimpleLogger) SetVerbose(verbose bool) {
-	l.verbose = verbose
+// LogFields logs additional fields
+func (l *SimpleLogger) LogFields(enable bool) {
+	l.logFields = enable
 }
 
-// logMessage logs a message in structured key-value pairs format.
-func (l *SimpleLogger) logMessage(output io.Writer, level string, message string, fields map[string]string) {
+// Infof logs an info message with formatting
+func (l *SimpleLogger) Infof(format string, args ...interface{}) {
+	e := l.WithFields(nil)
+	e.Infof(format, args...)
+}
+
+// Warnf logs a warning message with formatting
+func (l *SimpleLogger) Warnf(format string, args ...interface{}) {
+	e := l.WithFields(nil)
+	e.Warnf(format, args...)
+}
+
+// WithFields creates a new entry with fields
+func (l *SimpleLogger) WithFields(fields Fields) *LoggerEntry {
+	return &LoggerEntry{
+		logger: l,
+		fields: fields,
+	}
+}
+
+// Infof logs an info message with formatting
+func (e *LoggerEntry) Infof(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	e.log("info", message)
+}
+
+// Warnf logs a warning message with formatting
+func (e *LoggerEntry) Warnf(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	e.log("warn", message)
+}
+
+// log logs a message with the specified level
+func (e *LoggerEntry) log(level string, message string) {
 	var logEntry strings.Builder
 	logEntry.WriteString(fmt.Sprintf("ts=%s level=%s msg=%q", time.Now().Format(time.RFC3339), level, message))
-	if l.verbose {
-		keys := make([]string, 0, len(fields))
-		for k := range fields {
+
+	if e.logger.logFields {
+		keys := make([]string, 0, len(e.fields))
+		for k := range e.fields {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			logEntry.WriteString(fmt.Sprintf(" %s=%q", k, fields[k]))
+			logEntry.WriteString(fmt.Sprintf(" %s=%q", k, e.fields[k]))
 		}
 	}
+
+	output := e.logger.infoOutput
+	if level == "warn" {
+		output = e.logger.errorOutput
+	}
+
 	fmt.Fprintln(output, logEntry.String())
-}
-
-// Info logs an info message
-func (l *SimpleLogger) Info(message string, fields map[string]string) {
-	l.logMessage(l.infoOutput, "info", message, fields)
-}
-
-// Warn logs a warning message
-func (l *SimpleLogger) Warn(message string, fields map[string]string) {
-	l.logMessage(l.errorOutput, "warn", message, fields)
 }
 
 // parseEnv retrieves and validates the environment variables required for the target checker.
@@ -87,7 +126,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		TargetAddress: getenv("TARGET_ADDRESS"),
 		Interval:      2 * time.Second, // default interval
 		DialTimeout:   1 * time.Second, // default dial timeout
-		Verbose:       false,
+		LogFields:     false,
 	}
 
 	if env.TargetName == "" {
@@ -122,11 +161,11 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		}
 	}
 
-	if verboseStr := getenv("VERBOSE"); verboseStr != "" {
+	if logFieldsStr := getenv("LOG_FIELDS"); logFieldsStr != "" {
 		var err error
-		env.Verbose, err = strconv.ParseBool(verboseStr)
+		env.LogFields, err = strconv.ParseBool(logFieldsStr)
 		if err != nil {
-			return Vars{}, fmt.Errorf("invalid VERBOSE value: %s", err)
+			return Vars{}, fmt.Errorf("invalid LOG_FIELDS value: %s", err)
 		}
 	}
 
@@ -149,7 +188,7 @@ func runLoop(ctx context.Context, envVars Vars, logger Logger) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	fields := map[string]string{
+	fields := Fields{
 		"target_name":    envVars.TargetName,
 		"target_address": envVars.TargetAddress,
 		"interval":       envVars.Interval.String(),
@@ -157,7 +196,7 @@ func runLoop(ctx context.Context, envVars Vars, logger Logger) error {
 		"version":        version,
 	}
 
-	logger.Info(fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), fields)
+	logger.WithFields(fields).Infof("Waiting for %s to become ready...", envVars.TargetName)
 
 	dialer := &net.Dialer{
 		Timeout: envVars.DialTimeout,
@@ -167,12 +206,12 @@ func runLoop(ctx context.Context, envVars Vars, logger Logger) error {
 		err := checkConnection(ctx, dialer, envVars.TargetAddress)
 		if err == nil {
 			delete(fields, "error")
-			logger.Info("Target is ready ✓", fields)
+			logger.WithFields(fields).Infof("%s is ready ✓", envVars.TargetName)
 			return nil
 		}
 
 		fields["error"] = err.Error()
-		logger.Warn("Target is not ready ✗", fields)
+		logger.WithFields(fields).Warnf("%s is not ready ✗", envVars.TargetName)
 
 		select {
 		case <-time.After(envVars.Interval):
@@ -195,7 +234,7 @@ func run(ctx context.Context, getenv func(string) string, stdErr, stdOut io.Writ
 	}
 
 	logger := NewSimpleLogger(stdOut, stdErr)
-	logger.SetVerbose(envVars.Verbose)
+	logger.LogFields(envVars.LogFields)
 
 	return runLoop(ctx, envVars, logger)
 }
