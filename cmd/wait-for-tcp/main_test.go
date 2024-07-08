@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"reflect"
 	"strings"
@@ -308,76 +309,6 @@ func TestCheckConnection(t *testing.T) {
 	})
 }
 
-func TestSimpleLogger(t *testing.T) {
-	t.Run("Info logs message with fields", func(t *testing.T) {
-		t.Parallel()
-
-		var output strings.Builder
-		logger := NewSimpleLogger(&output, &output)
-		logger.LogFields(true)
-
-		fields := Fields{
-			"field1": "value1",
-			"field2": "value2",
-		}
-
-		logger.WithFields(fields).Infof("Test info message")
-		logEntry := output.String()
-		expected := "level=info msg=\"Test info message\" field1=\"value1\" field2=\"value2\""
-
-		if !strings.Contains(logEntry, expected) {
-			t.Errorf("Expected log entry to contain %q but got %q", expected, logEntry)
-		}
-	})
-
-	t.Run("Warn logs message with fields", func(t *testing.T) {
-		t.Parallel()
-
-		var output strings.Builder
-		logger := NewSimpleLogger(&output, &output)
-		logger.LogFields(true)
-
-		fields := Fields{
-			"field1": "value1",
-			"field2": "value2",
-		}
-
-		logger.WithFields(fields).Warnf("Test warn message")
-		logEntry := output.String()
-		expected := "level=warn msg=\"Test warn message\" field1=\"value1\" field2=\"value2\""
-
-		if !strings.Contains(logEntry, expected) {
-			t.Errorf("Expected log entry to contain %q but got %q", expected, logEntry)
-		}
-	})
-
-	t.Run("Info logs message without fields when logFields is false", func(t *testing.T) {
-		t.Parallel()
-
-		var output strings.Builder
-		logger := NewSimpleLogger(&output, &output)
-		logger.LogFields(false)
-
-		fields := Fields{
-			"field1": "value1",
-			"field2": "value2",
-		}
-
-		logger.WithFields(fields).Infof("Test info message")
-		logEntry := output.String()
-		expected := "level=info msg=\"Test info message\""
-
-		if !strings.Contains(logEntry, expected) {
-			t.Errorf("Expected log entry to contain %q but got %q", expected, logEntry)
-		}
-
-		unexpected := "field1=\"value1\""
-		if strings.Contains(logEntry, unexpected) {
-			t.Errorf("Did not expect log entry to contain %q but it did", unexpected)
-		}
-	})
-}
-
 func TestRunLoop(t *testing.T) {
 	t.Run("Target is ready", func(t *testing.T) {
 		t.Parallel()
@@ -396,12 +327,11 @@ func TestRunLoop(t *testing.T) {
 		}
 		defer lis.Close()
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		logger := NewSimpleLogger(&stdOut, &stdErr)
-		logger.LogFields(true)
+		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 		// cancel runLoop after 2 Seconds
 		go func() {
@@ -412,9 +342,6 @@ func TestRunLoop(t *testing.T) {
 		err = runLoop(ctx, envVars, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
-		}
-		if stdErr.String() != "" {
-			t.Errorf("Unexpected error: %v", stdErr.String())
 		}
 
 		expected := fmt.Sprintf("%s is ready ✓", envVars.TargetName)
@@ -433,12 +360,11 @@ func TestRunLoop(t *testing.T) {
 			DialTimeout:   1 * time.Second,
 		}
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		logger := NewSimpleLogger(&stdOut, &stdErr)
-		logger.LogFields(true)
+		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 		// cancel runLoop after 2 Seconds
 		go func() {
@@ -452,8 +378,8 @@ func TestRunLoop(t *testing.T) {
 		}
 
 		expected := fmt.Sprintf("%s is not ready ✗", envVars.TargetName)
-		if !strings.Contains(stdErr.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, stdErr.String())
+		if !strings.Contains(stdOut.String(), expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
 
@@ -483,12 +409,11 @@ func TestRunLoop(t *testing.T) {
 			time.Sleep(1 * time.Second) // Ensure runloop get a successful attemp
 		}()
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		logger := NewSimpleLogger(&stdOut, &stdErr)
-		logger.LogFields(true)
+		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 		if err := runLoop(ctx, envVars, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -499,8 +424,14 @@ func TestRunLoop(t *testing.T) {
 		defer lis.Close()
 
 		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
+		// output must be:
+		// 0: Waiting for database to become ready...
+		// 1: database is not ready ✗
+		// 2: database is not ready ✗
+		// 3: database is not ready ✗
+		// 4: database is ready ✓
 
-		expectedOuts := 2
+		expectedOuts := 5
 		if len(stdOutEntries) != expectedOuts {
 			t.Errorf("Expected output to contain '%d' lines but got '%d'.", expectedOuts, len(stdOutEntries))
 		}
@@ -510,23 +441,18 @@ func TestRunLoop(t *testing.T) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[0])
 		}
 
-		expected = fmt.Sprintf("%s is ready ✓", envVars.TargetName)
-		if !strings.Contains(stdOutEntries[1], expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
-		}
-
-		stdErrEntries := strings.Split(strings.TrimSpace(stdErr.String()), "\n")
-
-		expectedErrs := 3
-		if len(stdErrEntries) != expectedErrs {
-			t.Errorf("Expected output to contain '%d' lines but got '%d'", expectedErrs, len(stdErrEntries))
-		}
-
 		expected = fmt.Sprintf("%s is not ready ✗", envVars.TargetName)
-		for i := 1; i < len(stdErrEntries); i++ {
-			if !strings.Contains(stdErrEntries[i], expected) {
-				t.Errorf("Expected output to contain %q but got %q", expected, stdErrEntries[i])
+		from := 1
+		to := 3
+		for i := from; i < to; i++ {
+			if !strings.Contains(stdOutEntries[i], expected) {
+				t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[i])
 			}
+		}
+
+		expected = fmt.Sprintf("%s is ready ✓", envVars.TargetName)
+		if !strings.Contains(stdOutEntries[4], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
 		}
 	})
 
@@ -540,12 +466,11 @@ func TestRunLoop(t *testing.T) {
 			DialTimeout:   1 * time.Second,
 		}
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		logger := NewSimpleLogger(&stdOut, &stdErr)
-		logger.LogFields(true)
+		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 		// cancel runLoop after 2 Seconds
 		go func() {
@@ -558,8 +483,8 @@ func TestRunLoop(t *testing.T) {
 		}
 
 		expected := "connect: connection refused"
-		if !strings.Contains(stdErr.String(), expected) {
-			t.Errorf("Expected output to contain %q but got %q", expected, stdErr.String())
+		if !strings.Contains(stdOut.String(), expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
 
@@ -577,8 +502,7 @@ func TestRunLoop(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		logger := NewSimpleLogger(&stdOut, &stdErr)
-		logger.LogFields(true)
+		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 		err := runLoop(ctx, envVars, logger)
 		if err != nil && err != context.DeadlineExceeded {
@@ -602,11 +526,10 @@ func TestRunLoop(t *testing.T) {
 			DialTimeout:   1 * time.Second,
 		}
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 
-		logger := NewSimpleLogger(&stdOut, &stdErr)
-		logger.LogFields(true)
+		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 		// cancel runLoop after 1 Seconds
 		go func() {
@@ -639,12 +562,11 @@ func TestConcurrentConnections(t *testing.T) {
 	}
 	defer lis.Close()
 
-	var stdErr, stdOut strings.Builder
+	var stdOut strings.Builder
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := NewSimpleLogger(&stdOut, &stdErr)
-	logger.LogFields(true)
+	logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 	var wg sync.WaitGroup
 	numRoutines := 5
@@ -707,7 +629,7 @@ func TestRun(t *testing.T) {
 			cancel()
 		}()
 
-		if err := run(ctx, getenv, &stdErr, &stdOut); err != nil {
+		if err := run(ctx, getenv, &stdOut); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if stdErr.String() != "" {
@@ -743,11 +665,11 @@ func TestRun(t *testing.T) {
 			return env[key]
 		}
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := run(ctx, getenv, &stdErr, &stdOut)
+		err := run(ctx, getenv, &stdOut)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -770,11 +692,11 @@ func TestRun(t *testing.T) {
 			return env[key]
 		}
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err := run(ctx, getenv, &stdErr, &stdOut)
+		err := run(ctx, getenv, &stdOut)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
