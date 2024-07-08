@@ -93,6 +93,16 @@ func runLoop(ctx context.Context, envVars Vars, logger *slog.Logger) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	if envVars.LogFields {
+		logger = logger.With(
+			"target_name", envVars.TargetName,
+			"target_address", envVars.TargetAddress,
+			"interval", envVars.Interval.String(),
+			"dial_timeout", envVars.DialTimeout.String(),
+			"version", version,
+		)
+	}
+
 	logger.Info(fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName))
 
 	dialer := &net.Dialer{
@@ -129,15 +139,6 @@ func run(ctx context.Context, getenv func(string) string, stdOut io.Writer) erro
 	}
 
 	logger := slog.New(slog.NewTextHandler(stdOut, nil))
-	if envVars.LogFields {
-		logger = logger.With(
-			"target_name", envVars.TargetName,
-			"target_address", envVars.TargetAddress,
-			"interval", envVars.Interval.String(),
-			"dial_timeout", envVars.DialTimeout.String(),
-			"version", version,
-		)
-	}
 
 	return runLoop(ctx, envVars, logger)
 }
