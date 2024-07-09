@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const version = "0.0.17"
+const version = "0.0.18"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -124,7 +124,7 @@ func runLoop(ctx context.Context, envVars Vars, logger *slog.Logger) error {
 }
 
 // run is the main entry point
-func run(ctx context.Context, getenv func(string) string, stdOut io.Writer) error {
+func run(ctx context.Context, getenv func(string) string, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -137,7 +137,7 @@ func run(ctx context.Context, getenv func(string) string, stdOut io.Writer) erro
 		return err
 	}
 
-	slogHandler := slog.NewTextHandler(stdOut, nil)
+	slogHandler := slog.NewTextHandler(output, nil)
 	logger := slog.New(slogHandler)
 
 	return runLoop(ctx, envVars, logger)
