@@ -21,7 +21,6 @@ func TestParseEnv(t *testing.T) {
 			"TARGET_ADDRESS": "localhost:5432",
 			"INTERVAL":       "1s",
 			"DIAL_TIMEOUT":   "1s",
-			"LOG_FIELDS":     "true",
 		}
 
 		getenv := func(key string) string {
@@ -38,18 +37,17 @@ func TestParseEnv(t *testing.T) {
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
-			LogFields:     true,
 		}
 		if !reflect.DeepEqual(envVars, expected) {
 			t.Errorf("Expected %+v, got %+v", expected, envVars)
 		}
 	})
 
-	t.Run("Missing TARGET_NAME", func(t *testing.T) {
+	t.Run("Invalid Interval", func(t *testing.T) {
 		t.Parallel()
 
 		env := map[string]string{
-			"TARGET_ADDRESS": "localhost:5432",
+			"INTERVAL": "-s",
 		}
 
 		getenv := func(key string) string {
@@ -57,6 +55,64 @@ func TestParseEnv(t *testing.T) {
 		}
 
 		_, err := parseEnv(getenv)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := fmt.Sprintf("invalid INTERVAL value: time: invalid duration \"%s\"", env["INTERVAL"])
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Invalid dial timeout", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"DIAL_TIMEOUT": "-s",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		_, err := parseEnv(getenv)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := fmt.Sprintf("invalid DIAL_TIMEOUT value: time: invalid duration \"%s\"", env["DIAL_TIMEOUT"])
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
+		}
+	})
+}
+
+func TestValidateEnv(t *testing.T) {
+	t.Run("Valid environment variables", func(t *testing.T) {
+		t.Parallel()
+
+		env := Vars{
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      1 * time.Second,
+			DialTimeout:   1 * time.Second,
+		}
+
+		err := validateEnv(&env)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	})
+
+	t.Run("Missing TARGET_NAME", func(t *testing.T) {
+		t.Parallel()
+
+		env := Vars{
+			TargetAddress: "localhost:5432",
+		}
+
+		err := validateEnv(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -70,15 +126,11 @@ func TestParseEnv(t *testing.T) {
 	t.Run("Missing TARGET_ADDRESS", func(t *testing.T) {
 		t.Parallel()
 
-		env := map[string]string{
-			"TARGET_NAME": "database",
+		env := Vars{
+			TargetName: "database",
 		}
 
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		_, err := parseEnv(getenv)
+		err := validateEnv(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -92,16 +144,12 @@ func TestParseEnv(t *testing.T) {
 	t.Run("Invalid TARGET_ADDRESS (port)", func(t *testing.T) {
 		t.Parallel()
 
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost",
+		env := Vars{
+			TargetName:    "database",
+			TargetAddress: "localhost",
 		}
 
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		_, err := parseEnv(getenv)
+		err := validateEnv(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -115,16 +163,12 @@ func TestParseEnv(t *testing.T) {
 	t.Run("Invalid TARGET_ADDRESS (schema)", func(t *testing.T) {
 		t.Parallel()
 
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "http://localhost:5432",
+		env := Vars{
+			TargetName:    "database",
+			TargetAddress: "http://localhost:5432",
 		}
 
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		_, err := parseEnv(getenv)
+		err := validateEnv(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -138,131 +182,38 @@ func TestParseEnv(t *testing.T) {
 	t.Run("Invalid INTERVAL", func(t *testing.T) {
 		t.Parallel()
 
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost:5432",
-			"INTERVAL":       "invalid",
+		env := Vars{
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			Interval:      -1 * time.Second,
 		}
 
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		_, err := parseEnv(getenv)
+		err := validateEnv(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
 
-		expected := "invalid INTERVAL value: time: invalid duration \"invalid\""
+		expected := "invalid INTERVAL value: interval cannot be negative"
 		if err.Error() != expected {
 			t.Errorf("Expected output %q but got %q", expected, err.Error())
-		}
-	})
-
-	t.Run("Missing port in TARGET_ADDRESS", func(t *testing.T) {
-		t.Parallel()
-
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost",
-		}
-
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		_, err := parseEnv(getenv)
-		if err == nil {
-			t.Error("Expected error but got none")
-		}
-
-		expected := "invalid TARGET_ADDRESS format, must be host:port"
-		if err.Error() != expected {
-			t.Errorf("Expected output %q but got %q", expected, err.Error())
-		}
-	})
-
-	t.Run("Extremely high INTERVAL and DIAL_TIMEOUT", func(t *testing.T) {
-		t.Parallel()
-
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost:5432",
-			"INTERVAL":       "10000h",
-			"DIAL_TIMEOUT":   "10000h",
-		}
-
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		envVars, err := parseEnv(getenv)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-
-		expected := Vars{
-			TargetName:    "database",
-			TargetAddress: "localhost:5432",
-			Interval:      10000 * time.Hour,
-			DialTimeout:   10000 * time.Hour,
-			LogFields:     false,
-		}
-		if !reflect.DeepEqual(envVars, expected) {
-			t.Errorf("Expected %+v, got %+v", expected, envVars)
-		}
-	})
-
-	t.Run("Extremely low INTERVAL and DIAL_TIMEOUT", func(t *testing.T) {
-		t.Parallel()
-
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost:5432",
-			"INTERVAL":       "1ms",
-			"DIAL_TIMEOUT":   "1ms",
-		}
-
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		envVars, err := parseEnv(getenv)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-
-		expected := Vars{
-			TargetName:    "database",
-			TargetAddress: "localhost:5432",
-			Interval:      1 * time.Millisecond,
-			DialTimeout:   1 * time.Millisecond,
-			LogFields:     false,
-		}
-		if !reflect.DeepEqual(envVars, expected) {
-			t.Errorf("Expected %+v, got %+v", expected, envVars)
 		}
 	})
 
 	t.Run("Invalid DIAL_TIMEOUT", func(t *testing.T) {
 		t.Parallel()
 
-		env := map[string]string{
-			"TARGET_NAME":    "database",
-			"TARGET_ADDRESS": "localhost:5432",
-			"DIAL_TIMEOUT":   "invalid",
+		env := Vars{
+			TargetName:    "database",
+			TargetAddress: "localhost:5432",
+			DialTimeout:   -1 * time.Second,
 		}
 
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		_, err := parseEnv(getenv)
+		err := validateEnv(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
 
-		expected := "invalid DIAL_TIMEOUT value: time: invalid duration \"invalid\""
+		expected := "invalid DIAL_TIMEOUT value: dial timeout cannot be negative"
 		if err.Error() != expected {
 			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
@@ -387,8 +338,8 @@ func TestRunLoop(t *testing.T) {
 		t.Parallel()
 
 		envVars := Vars{
-			TargetName:    "database",
-			TargetAddress: "localhost:1433",
+			TargetName:    "PostgreSQL",
+			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
@@ -406,7 +357,7 @@ func TestRunLoop(t *testing.T) {
 			if err != nil {
 				panic("failed to listen: " + err.Error())
 			}
-			time.Sleep(1 * time.Second) // Ensure runloop get a successful attemp
+			time.Sleep(1 * time.Second) // Ensure runloop get a successful attempt
 		}()
 
 		var stdOut strings.Builder
@@ -435,6 +386,8 @@ func TestRunLoop(t *testing.T) {
 		if len(stdOutEntries) != expectedOuts {
 			t.Errorf("Expected output to contain '%d' lines but got '%d'.", expectedOuts, len(stdOutEntries))
 		}
+
+		t.Logf(stdOut.String())
 
 		expected := fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName)
 		if !strings.Contains(stdOutEntries[0], expected) {
@@ -605,7 +558,6 @@ func TestRun(t *testing.T) {
 			"TARGET_ADDRESS": "localhost:8091",
 			"INTERVAL":       "1s",
 			"DIAL_TIMEOUT":   "1s",
-			"LOG_FIELDS":     "true",
 		}
 
 		getenv := func(key string) string {

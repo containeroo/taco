@@ -10,7 +10,6 @@ The application requires the following environment variables to be set:
 - `TARGET_ADDRESS`: The address of the target in the format `host:port`.
 - `INTERVAL`: The interval between connection attempts (optional, default: `2s`).
 - `DIAL_TIMEOUT`: The timeout for each connection attempt (optional, default: `1s`).
-- `LOG_FIELDS`: Log additional fields (optional, default: `false`). Set to `true` to include additional log details.
 
 ## Behavior
 
@@ -25,11 +24,11 @@ The application requires the following environment variables to be set:
 The application uses structured logging to provide clear and consistent log messages. Logs are output in a key-value format with timestamps and log levels.
 
 ```
-ts=2024-07-05T13:08:20+02:00 level=info msg="Waiting for PostgreSQL to become ready..." dial_timeout="1s" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
-ts=2024-07-05T13:08:21+02:00 level=warn msg="PostgreSQL is not ready ✗" dial_timeout="1s" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
-ts=2024-07-05T13:08:24+02:00 level=warn msg="PostgreSQL is not ready ✗" dial_timeout="1s" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
-ts=2024-07-05T13:08:27+02:00 level=warn msg="PostgreSQL is not ready ✗" dial_timeout="1s" error="dial tcp: lookup postgres.default.svc.cluster.local: i/o timeout" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
-ts=2024-07-05T13:08:30+02:00 level=info msg="PostgreSQL is ready ✓" dial_timeout="1s" interval="2s" target_address="postgres.default.svc.cluster.local:5432" target_name="PostgreSQL" version="0.0.14"
+ime=2024-07-09T16:20:35.953+02:00 level=INFO msg="Waiting for PostgreSQL to become ready..." target_address=postgres.default.svc.cluster.local:5432:5432 version=0.0.17
+time=2024-07-09T16:20:35.954+02:00 level=WARN msg="PostgreSQL is not ready ✗" target_address=postgres.default.svc.cluster.local:5432:5432 error="dial tcp [::1]:5432: connect: connection refused"
+time=2024-07-09T16:20:36.957+02:00 level=WARN msg="PostgreSQL is not ready ✗" target_address=postgres.default.svc.cluster.local:5432:5432 error="dial tcp [::1]:5432: connect: connection refused"
+time=2024-07-09T16:20:37.959+02:00 level=WARN msg="PostgreSQL is not ready ✗" target_address=postgres.default.svc.cluster.local:5432:5432 error="dial tcp [::1]:5432: connect: connection refused"
+time=2024-07-09T16:20:38.962+02:00 level=INFO msg="PostgreSQL is ready ✓" target_address=postgres.default.svc.cluster.local:5432:5432
 ```
 
 ## Kubernetes Init Container Configuration
