@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.18"
+const version = "0.0.19"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
@@ -104,8 +104,6 @@ func checkConnection(ctx context.Context, dialer *net.Dialer, address string) er
 
 // runLoop continuously attempts to connect to the specified service until the service becomes available or the context is cancelled.
 func runLoop(ctx context.Context, envVars Vars, logger *slog.Logger) error {
-	logger = logger.With("target_address", envVars.TargetAddress)
-
 	logger.Info(fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName))
 
 	dialer := &net.Dialer{
