@@ -21,6 +21,7 @@ func TestParseEnv(t *testing.T) {
 			"TARGET_ADDRESS": "localhost:5432",
 			"INTERVAL":       "1s",
 			"DIAL_TIMEOUT":   "1s",
+			"LOG_FIELDS":     "true",
 		}
 
 		getenv := func(key string) string {
@@ -37,13 +38,14 @@ func TestParseEnv(t *testing.T) {
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
+			LogFields:     true,
 		}
 		if !reflect.DeepEqual(envVars, expected) {
 			t.Errorf("Expected %+v, got %+v", expected, envVars)
 		}
 	})
 
-	t.Run("Invalid Interval", func(t *testing.T) {
+	t.Run("Invalid INTERVAL", func(t *testing.T) {
 		t.Parallel()
 
 		env := map[string]string{
@@ -65,7 +67,7 @@ func TestParseEnv(t *testing.T) {
 		}
 	})
 
-	t.Run("Invalid dial timeout", func(t *testing.T) {
+	t.Run("Invalid DIAL_TIMEOUT", func(t *testing.T) {
 		t.Parallel()
 
 		env := map[string]string{
@@ -82,6 +84,28 @@ func TestParseEnv(t *testing.T) {
 		}
 
 		expected := fmt.Sprintf("invalid DIAL_TIMEOUT value: time: invalid duration \"%s\"", env["DIAL_TIMEOUT"])
+		if err.Error() != expected {
+			t.Errorf("Expected output %q but got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("Invalid LOG_FIELDS", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"LOG_FIELDS": "tr",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		_, err := parseEnv(getenv)
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+
+		expected := fmt.Sprintf("invalid LOG_FIELDS value: strconv.ParseBool: parsing \"%s\": invalid syntax", env["LOG_FIELDS"])
 		if err.Error() != expected {
 			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}

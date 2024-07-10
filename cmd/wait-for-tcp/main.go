@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -21,6 +22,7 @@ type Vars struct {
 	TargetAddress string        // The address of the target in the format 'host:port'.
 	Interval      time.Duration // The interval between connection attempts.
 	DialTimeout   time.Duration // The timeout for each connection attempt.
+	LogFields     bool          // Whether to log the fields in the log message.
 }
 
 // parseEnv retrieves the environment variables required for the target checker.
@@ -30,6 +32,7 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		TargetAddress: getenv("TARGET_ADDRESS"),
 		Interval:      2 * time.Second, // default interval
 		DialTimeout:   1 * time.Second, // default dial timeout
+		LogFields:     false,
 	}
 
 	if intervalStr := getenv("INTERVAL"); intervalStr != "" {
@@ -45,6 +48,14 @@ func parseEnv(getenv func(string) string) (Vars, error) {
 		env.DialTimeout, err = time.ParseDuration(dialTimeoutStr)
 		if err != nil {
 			return Vars{}, fmt.Errorf("invalid DIAL_TIMEOUT value: %s", err)
+		}
+	}
+
+	if logFieldsStr := getenv("LOG_FIELDS"); logFieldsStr != "" {
+		var err error
+		env.LogFields, err = strconv.ParseBool(logFieldsStr)
+		if err != nil {
+			return Vars{}, fmt.Errorf("invalid LOG_FIELDS value: %s", err)
 		}
 	}
 
@@ -95,7 +106,7 @@ func checkConnection(ctx context.Context, dialer *net.Dialer, address string) er
 func runLoop(ctx context.Context, envVars Vars, logger *slog.Logger) error {
 	logger = logger.With("target_address", envVars.TargetAddress)
 
-	logger.Info(fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName), "version", version)
+	logger.Info(fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName))
 
 	dialer := &net.Dialer{
 		Timeout: envVars.DialTimeout,
@@ -137,8 +148,16 @@ func run(ctx context.Context, getenv func(string) string, output io.Writer) erro
 		return err
 	}
 
-	slogHandler := slog.NewTextHandler(output, nil)
-	logger := slog.New(slogHandler)
+	logger := slog.New(slog.NewTextHandler(output, nil))
+	if envVars.LogFields {
+		logger = logger.With(
+			"target_name", envVars.TargetName,
+			"target_address", envVars.TargetAddress,
+			"interval", envVars.Interval.String(),
+			"dial_timeout", envVars.DialTimeout.String(),
+			"version", version,
+		)
+	}
 
 	return runLoop(ctx, envVars, logger)
 }
