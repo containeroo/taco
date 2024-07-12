@@ -1,4 +1,4 @@
-# wait-for-tcp
+# TACO (TCP Availability Connection Observer)
 
 This is a simple Go application with zero external dependencies that checks if a specified TCP target is available. It continuously attempts to connect to the specified target at regular intervals until the target becomes available or the program is terminated.
 
@@ -38,7 +38,7 @@ Configure your Kubernetes deployment to use this init container:
 ```yaml
 initContainers:
   - name: wait-for-response
-    image: containeroo/wait-for-tcp:latest
+    image: containeroo/taco:latest
     env:
       - name: TARGET_NAME
         value: "PostgreSQL"

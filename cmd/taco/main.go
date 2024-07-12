@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.20"
+const version = "0.0.21"
 
 // Vars holds the environment variables required for the target checker.
 type Vars struct {
