@@ -308,13 +308,13 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel runLoop after 2 Seconds
+		// cancel waitForTargetReady after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		err = runLoop(ctx, envVars, logger)
+		err = waitForTargetReady(ctx, envVars, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -341,13 +341,13 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel runLoop after 2 Seconds
+		// cancel waitForTargetReady after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		err := runLoop(ctx, envVars, logger)
+		err := waitForTargetReady(ctx, envVars, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -390,7 +390,7 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		if err := runLoop(ctx, envVars, logger); err != nil {
+		if err := waitForTargetReady(ctx, envVars, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -449,13 +449,13 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel runLoop after 2 Seconds
+		// cancel waitForTargetReady after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		if err := runLoop(ctx, envVars, logger); err != nil {
+		if err := waitForTargetReady(ctx, envVars, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -481,7 +481,7 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		err := runLoop(ctx, envVars, logger)
+		err := waitForTargetReady(ctx, envVars, logger)
 		if err != nil && err != context.DeadlineExceeded {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -508,14 +508,14 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel runLoop after 1 Seconds
+		// cancel waitForTargetReady after 1 Seconds
 		go func() {
 			time.Sleep(1 * time.Second)
 			cancel()
 		}()
 
-		err := runLoop(ctx, envVars, logger)
-		// runLoop returns nil if context is canceled
+		err := waitForTargetReady(ctx, envVars, logger)
+		// waitForTargetReady returns nil if context is canceled
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -552,7 +552,7 @@ func TestConcurrentConnections(t *testing.T) {
 	for i := 0; i < numRoutines; i++ {
 		go func() {
 			defer wg.Done()
-			err := runLoop(ctx, envVars, logger)
+			err := waitForTargetReady(ctx, envVars, logger)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
