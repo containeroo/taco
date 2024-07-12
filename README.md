@@ -37,7 +37,7 @@ Configure your Kubernetes deployment to use this init container:
 
 ```yaml
 initContainers:
-  - name: wait-for-response
+  - name: wait-for-postgres
     image: containeroo/taco:latest
     env:
       - name: TARGET_NAME
