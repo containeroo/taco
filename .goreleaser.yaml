@@ -1,4 +1,4 @@
-project_name: wait-for-tcp
+project_name: taco
 version: 2
 
 before:
@@ -6,8 +6,8 @@ before:
     - go mod tidy
 
 builds:
-  - id: wait-for-tcp-build
-    main: ./cmd/wait-for-tcp/main.go
+  - id: taco-build
+    main: ./cmd/taco/main.go
     env:
       - CGO_ENABLED=0
     goos:
@@ -18,8 +18,8 @@ builds:
 
 dockers:
   - image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}-amd64
-      - ghcr.io/containeroo/wait-for-tcp:latest-amd64
+      - ghcr.io/containeroo/taco:{{ trimprefix .Tag "v" }}-amd64
+      - ghcr.io/containeroo/taco:latest-amd64
     use: buildx
     dockerfile: Dockerfile
     build_flag_templates:
@@ -28,8 +28,8 @@ dockers:
       - go.mod
       - cmd
   - image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}-arm64v8
-      - ghcr.io/containeroo/wait-for-tcp:latest-arm64v8
+      - ghcr.io/containeroo/taco:{{ trimprefix .Tag "v" }}-arm64v8
+      - ghcr.io/containeroo/taco:latest-arm64v8
     use: buildx
     goarch: arm64
     dockerfile: Dockerfile
@@ -40,11 +40,11 @@ dockers:
       - cmd
 
 docker_manifests:
-  - name_template: ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}
+  - name_template: ghcr.io/containeroo/taco:{{ trimprefix .Tag "v" }}
     image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}-amd64
-      - ghcr.io/containeroo/wait-for-tcp:{{ trimprefix .Tag "v" }}-arm64v8
-  - name_template: ghcr.io/containeroo/wait-for-tcp:latest
+      - ghcr.io/containeroo/taco:{{ trimprefix .Tag "v" }}-amd64
+      - ghcr.io/containeroo/taco:{{ trimprefix .Tag "v" }}-arm64v8
+  - name_template: ghcr.io/containeroo/taco:latest
     image_templates:
-      - ghcr.io/containeroo/wait-for-tcp:latest-amd64
-      - ghcr.io/containeroo/wait-for-tcp:latest-arm64v8
+      - ghcr.io/containeroo/taco:latest-amd64
+      - ghcr.io/containeroo/taco:latest-arm64v8
