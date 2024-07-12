@@ -18,21 +18,21 @@ const version = "0.0.22"
 
 // Config holds the required environment variables.
 type Config struct {
-	TargetName    string        // The name of the target to check.
-	TargetAddress string        // The address of the target in the format 'host:port'.
-	Interval      time.Duration // The interval between connection attempts.
-	DialTimeout   time.Duration // The timeout for each connection attempt.
-	LogFields     bool          // Whether to log the fields in the log message.
+	TargetName          string        // The name of the target to check.
+	TargetAddress       string        // The address of the target in the format 'host:port'.
+	Interval            time.Duration // The interval between connection attempts.
+	DialTimeout         time.Duration // The timeout for each connection attempt.
+	LogAdditionalFields bool          // Whether to log the fields in the log message.
 }
 
 // parseConfig retrieves and parses the required environment variables.
 func parseConfig(getenv func(string) string) (Config, error) {
 	cfg := Config{
-		TargetName:    getenv("TARGET_NAME"),
-		TargetAddress: getenv("TARGET_ADDRESS"),
-		Interval:      2 * time.Second, // default interval
-		DialTimeout:   1 * time.Second, // default dial timeout
-		LogFields:     false,
+		TargetName:          getenv("TARGET_NAME"),
+		TargetAddress:       getenv("TARGET_ADDRESS"),
+		Interval:            2 * time.Second, // default interval
+		DialTimeout:         1 * time.Second, // default dial timeout
+		LogAdditionalFields: false,
 	}
 
 	if intervalStr := getenv("INTERVAL"); intervalStr != "" {
@@ -51,11 +51,11 @@ func parseConfig(getenv func(string) string) (Config, error) {
 		}
 	}
 
-	if logFieldsStr := getenv("LOG_FIELDS"); logFieldsStr != "" {
+	if logFieldsStr := getenv("LOG_ADDITIONAL_FIELDS"); logFieldsStr != "" {
 		var err error
-		cfg.LogFields, err = strconv.ParseBool(logFieldsStr)
+		cfg.LogAdditionalFields, err = strconv.ParseBool(logFieldsStr)
 		if err != nil {
-			return Config{}, fmt.Errorf("invalid LOG_FIELDS value: %s", err)
+			return Config{}, fmt.Errorf("invalid LOG_ADDITIONAL_FIELDS value: %s", err)
 		}
 	}
 
@@ -146,7 +146,7 @@ func run(ctx context.Context, getenv func(string) string, output io.Writer) erro
 	}
 
 	logger := slog.New(slog.NewTextHandler(output, nil))
-	if cfg.LogFields {
+	if cfg.LogAdditionalFields {
 		logger = logger.With(
 			"target_name", cfg.TargetName,
 			"target_address", cfg.TargetAddress,
