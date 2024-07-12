@@ -28,20 +28,20 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		envVars, err := parseEnv(getenv)
+		envConfig, err := parseConfig(getenv)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := Vars{
+		expected := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 			LogFields:     true,
 		}
-		if !reflect.DeepEqual(envVars, expected) {
-			t.Errorf("Expected %+v, got %+v", expected, envVars)
+		if !reflect.DeepEqual(envConfig, expected) {
+			t.Errorf("Expected %+v, got %+v", expected, envConfig)
 		}
 	})
 
@@ -56,7 +56,7 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		_, err := parseEnv(getenv)
+		_, err := parseConfig(getenv)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -78,7 +78,7 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		_, err := parseEnv(getenv)
+		_, err := parseConfig(getenv)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -100,7 +100,7 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		_, err := parseEnv(getenv)
+		_, err := parseConfig(getenv)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -116,14 +116,14 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Valid environment variables", func(t *testing.T) {
 		t.Parallel()
 
-		env := Vars{
+		env := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
 
-		err := validateEnv(&env)
+		err := validateConfig(&env)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -132,11 +132,11 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Missing TARGET_NAME", func(t *testing.T) {
 		t.Parallel()
 
-		env := Vars{
+		env := Config{
 			TargetAddress: "localhost:5432",
 		}
 
-		err := validateEnv(&env)
+		err := validateConfig(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -150,11 +150,11 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Missing TARGET_ADDRESS", func(t *testing.T) {
 		t.Parallel()
 
-		env := Vars{
+		env := Config{
 			TargetName: "database",
 		}
 
-		err := validateEnv(&env)
+		err := validateConfig(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -168,12 +168,12 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid TARGET_ADDRESS (port)", func(t *testing.T) {
 		t.Parallel()
 
-		env := Vars{
+		env := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost",
 		}
 
-		err := validateEnv(&env)
+		err := validateConfig(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -187,12 +187,12 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid TARGET_ADDRESS (schema)", func(t *testing.T) {
 		t.Parallel()
 
-		env := Vars{
+		env := Config{
 			TargetName:    "database",
 			TargetAddress: "http://localhost:5432",
 		}
 
-		err := validateEnv(&env)
+		err := validateConfig(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -206,13 +206,13 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid INTERVAL", func(t *testing.T) {
 		t.Parallel()
 
-		env := Vars{
+		env := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			Interval:      -1 * time.Second,
 		}
 
-		err := validateEnv(&env)
+		err := validateConfig(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -226,13 +226,13 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid DIAL_TIMEOUT", func(t *testing.T) {
 		t.Parallel()
 
-		env := Vars{
+		env := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			DialTimeout:   -1 * time.Second,
 		}
 
-		err := validateEnv(&env)
+		err := validateConfig(&env)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -288,7 +288,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Target is ready", func(t *testing.T) {
 		t.Parallel()
 
-		envVars := Vars{
+		envConfig := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:27017",
 			Interval:      1 * time.Second,
@@ -296,7 +296,7 @@ func TestRunLoop(t *testing.T) {
 		}
 
 		// Setup a mock server to listen on localhost:5432
-		lis, err := net.Listen("tcp", envVars.TargetAddress)
+		lis, err := net.Listen("tcp", envConfig.TargetAddress)
 		if err != nil {
 			t.Fatalf("failed to listen: %v", err)
 		}
@@ -308,18 +308,18 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel waitForTargetReady after 2 Seconds
+		// cancel waitForTarget after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		err = waitForTargetReady(ctx, envVars, logger)
+		err = waitForTarget(ctx, envConfig, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := fmt.Sprintf("%s is ready ✓", envVars.TargetName)
+		expected := fmt.Sprintf("%s is ready ✓", envConfig.TargetName)
 		if !strings.Contains(stdOut.String(), expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
@@ -328,7 +328,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Target is not ready", func(t *testing.T) {
 		t.Parallel()
 
-		envVars := Vars{
+		envConfig := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:6379",
 			Interval:      1 * time.Second,
@@ -341,18 +341,18 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel waitForTargetReady after 2 Seconds
+		// cancel waitForTarget after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		err := waitForTargetReady(ctx, envVars, logger)
+		err := waitForTarget(ctx, envConfig, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := fmt.Sprintf("%s is not ready ✗", envVars.TargetName)
+		expected := fmt.Sprintf("%s is not ready ✗", envConfig.TargetName)
 		if !strings.Contains(stdOut.String(), expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
@@ -361,7 +361,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Successful run after 3 attempts", func(t *testing.T) {
 		t.Parallel()
 
-		envVars := Vars{
+		envConfig := Config{
 			TargetName:    "PostgreSQL",
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
@@ -375,9 +375,9 @@ func TestRunLoop(t *testing.T) {
 		// start listener after 2 seconds
 		go func() {
 			defer wg.Done() // Mark the WaitGroup as done when the goroutine completes
-			time.Sleep(envVars.Interval * 3)
+			time.Sleep(envConfig.Interval * 3)
 			var err error
-			lis, err = net.Listen("tcp", envVars.TargetAddress)
+			lis, err = net.Listen("tcp", envConfig.TargetAddress)
 			if err != nil {
 				panic("failed to listen: " + err.Error())
 			}
@@ -390,7 +390,7 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		if err := waitForTargetReady(ctx, envVars, logger); err != nil {
+		if err := waitForTarget(ctx, envConfig, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -413,12 +413,12 @@ func TestRunLoop(t *testing.T) {
 
 		t.Logf(stdOut.String())
 
-		expected := fmt.Sprintf("Waiting for %s to become ready...", envVars.TargetName)
+		expected := fmt.Sprintf("Waiting for %s to become ready...", envConfig.TargetName)
 		if !strings.Contains(stdOutEntries[0], expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[0])
 		}
 
-		expected = fmt.Sprintf("%s is not ready ✗", envVars.TargetName)
+		expected = fmt.Sprintf("%s is not ready ✗", envConfig.TargetName)
 		from := 1
 		to := 3
 		for i := from; i < to; i++ {
@@ -427,7 +427,7 @@ func TestRunLoop(t *testing.T) {
 			}
 		}
 
-		expected = fmt.Sprintf("%s is ready ✓", envVars.TargetName)
+		expected = fmt.Sprintf("%s is ready ✓", envConfig.TargetName)
 		if !strings.Contains(stdOutEntries[4], expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
 		}
@@ -436,7 +436,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Failed connection", func(t *testing.T) {
 		t.Parallel()
 
-		envVars := Vars{
+		envConfig := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:1433",
 			Interval:      1 * time.Second,
@@ -449,13 +449,13 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel waitForTargetReady after 2 Seconds
+		// cancel waitForTarget after 2 Seconds
 		go func() {
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
 
-		if err := waitForTargetReady(ctx, envVars, logger); err != nil {
+		if err := waitForTarget(ctx, envConfig, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -468,7 +468,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Context timeout", func(t *testing.T) {
 		t.Parallel()
 
-		envVars := Vars{
+		envConfig := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:3306",
 			Interval:      1 * time.Second,
@@ -481,7 +481,7 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		err := waitForTargetReady(ctx, envVars, logger)
+		err := waitForTarget(ctx, envConfig, logger)
 		if err != nil && err != context.DeadlineExceeded {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -496,7 +496,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Context cancel", func(t *testing.T) {
 		t.Parallel()
 
-		envVars := Vars{
+		envConfig := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:9042",
 			Interval:      1 * time.Second,
@@ -508,14 +508,14 @@ func TestRunLoop(t *testing.T) {
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		// cancel waitForTargetReady after 1 Seconds
+		// cancel waitForTarget after 1 Seconds
 		go func() {
 			time.Sleep(1 * time.Second)
 			cancel()
 		}()
 
-		err := waitForTargetReady(ctx, envVars, logger)
-		// waitForTargetReady returns nil if context is canceled
+		err := waitForTarget(ctx, envConfig, logger)
+		// waitForTarget returns nil if context is canceled
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -525,7 +525,7 @@ func TestRunLoop(t *testing.T) {
 func TestConcurrentConnections(t *testing.T) {
 	t.Parallel()
 
-	envVars := Vars{
+	envConfig := Config{
 		TargetName:    "database",
 		TargetAddress: "localhost:9200",
 		Interval:      1 * time.Second,
@@ -533,7 +533,7 @@ func TestConcurrentConnections(t *testing.T) {
 	}
 
 	// Setup a mock server to listen on localhost:5432
-	lis, err := net.Listen("tcp", envVars.TargetAddress)
+	lis, err := net.Listen("tcp", envConfig.TargetAddress)
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
@@ -552,7 +552,7 @@ func TestConcurrentConnections(t *testing.T) {
 	for i := 0; i < numRoutines; i++ {
 		go func() {
 			defer wg.Done()
-			err := waitForTargetReady(ctx, envVars, logger)
+			err := waitForTarget(ctx, envConfig, logger)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -567,7 +567,7 @@ func TestConcurrentConnections(t *testing.T) {
 
 	wg.Wait()
 
-	expected := fmt.Sprintf("%s is ready ✓", envVars.TargetName)
+	expected := fmt.Sprintf("%s is ready ✓", envConfig.TargetName)
 	if !strings.Contains(stdOut.String(), expected) {
 		t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 	}
