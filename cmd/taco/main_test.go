@@ -28,7 +28,7 @@ func TestParseEnv(t *testing.T) {
 			return env[key]
 		}
 
-		envConfig, err := parseConfig(getenv)
+		cfg, err := parseConfig(getenv)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -40,8 +40,8 @@ func TestParseEnv(t *testing.T) {
 			DialTimeout:         1 * time.Second,
 			LogAdditionalFields: true,
 		}
-		if !reflect.DeepEqual(envConfig, expected) {
-			t.Errorf("Expected %+v, got %+v", expected, envConfig)
+		if !reflect.DeepEqual(cfg, expected) {
+			t.Errorf("Expected %+v, got %+v", expected, cfg)
 		}
 	})
 
@@ -284,11 +284,11 @@ func TestCheckConnection(t *testing.T) {
 	})
 }
 
-func TestRunLoop(t *testing.T) {
+func TestWaitForTarget(t *testing.T) {
 	t.Run("Target is ready", func(t *testing.T) {
 		t.Parallel()
 
-		envConfig := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:27017",
 			Interval:      1 * time.Second,
@@ -296,7 +296,7 @@ func TestRunLoop(t *testing.T) {
 		}
 
 		// Setup a mock server to listen on localhost:5432
-		lis, err := net.Listen("tcp", envConfig.TargetAddress)
+		lis, err := net.Listen("tcp", cfg.TargetAddress)
 		if err != nil {
 			t.Fatalf("failed to listen: %v", err)
 		}
@@ -314,12 +314,12 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		err = waitForTarget(ctx, envConfig, logger)
+		err = waitForTarget(ctx, cfg, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := fmt.Sprintf("%s is ready ✓", envConfig.TargetName)
+		expected := fmt.Sprintf("%s is ready ✓", cfg.TargetName)
 		if !strings.Contains(stdOut.String(), expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
@@ -328,7 +328,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Target is not ready", func(t *testing.T) {
 		t.Parallel()
 
-		envConfig := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:6379",
 			Interval:      1 * time.Second,
@@ -347,12 +347,12 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		err := waitForTarget(ctx, envConfig, logger)
+		err := waitForTarget(ctx, cfg, logger)
 		if err != nil && err != context.Canceled {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := fmt.Sprintf("%s is not ready ✗", envConfig.TargetName)
+		expected := fmt.Sprintf("%s is not ready ✗", cfg.TargetName)
 		if !strings.Contains(stdOut.String(), expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
@@ -361,11 +361,12 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Successful run after 3 attempts", func(t *testing.T) {
 		t.Parallel()
 
-		envConfig := Config{
-			TargetName:    "PostgreSQL",
-			TargetAddress: "localhost:5432",
-			Interval:      1 * time.Second,
-			DialTimeout:   1 * time.Second,
+		cfg := Config{
+			TargetName:          "PostgreSQL",
+			TargetAddress:       "localhost:5432",
+			Interval:            1 * time.Second,
+			DialTimeout:         1 * time.Second,
+			LogAdditionalFields: true,
 		}
 
 		var wg sync.WaitGroup
@@ -375,9 +376,9 @@ func TestRunLoop(t *testing.T) {
 		// start listener after 2 seconds
 		go func() {
 			defer wg.Done() // Mark the WaitGroup as done when the goroutine completes
-			time.Sleep(envConfig.Interval * 3)
+			time.Sleep(cfg.Interval * 3)
 			var err error
-			lis, err = net.Listen("tcp", envConfig.TargetAddress)
+			lis, err = net.Listen("tcp", cfg.TargetAddress)
 			if err != nil {
 				panic("failed to listen: " + err.Error())
 			}
@@ -388,9 +389,16 @@ func TestRunLoop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
+		logger := slog.New(slog.NewTextHandler(&stdOut, &slog.HandlerOptions{}))
+		logger = logger.With(
+			"target_name", cfg.TargetName,
+			"target_address", cfg.TargetAddress,
+			"interval", cfg.Interval.String(),
+			"dial_timeout", cfg.DialTimeout.String(),
+			"version", version,
+		)
 
-		if err := waitForTarget(ctx, envConfig, logger); err != nil {
+		if err := waitForTarget(ctx, cfg, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -411,23 +419,32 @@ func TestRunLoop(t *testing.T) {
 			t.Errorf("Expected output to contain '%d' lines but got '%d'.", expectedOuts, len(stdOutEntries))
 		}
 
-		t.Logf(stdOut.String())
-
-		expected := fmt.Sprintf("Waiting for %s to become ready...", envConfig.TargetName)
+		expected := fmt.Sprintf("Waiting for %s to become ready...", cfg.TargetName)
 		if !strings.Contains(stdOutEntries[0], expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[0])
 		}
 
-		expected = fmt.Sprintf("%s is not ready ✗", envConfig.TargetName)
+		addressPort := strings.Split(cfg.TargetAddress, ":")[1]
 		from := 1
 		to := 3
 		for i := from; i < to; i++ {
+			expected = fmt.Sprintf("%s is not ready ✗", cfg.TargetName)
+			if !strings.Contains(stdOutEntries[i], expected) {
+				t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[i])
+			}
+
+			expected = fmt.Sprintf("error=\"dial tcp [::1]:%s: connect: connection refused\"", addressPort)
 			if !strings.Contains(stdOutEntries[i], expected) {
 				t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[i])
 			}
 		}
 
-		expected = fmt.Sprintf("%s is ready ✓", envConfig.TargetName)
+		expected = fmt.Sprintf("%s is ready ✓", cfg.TargetName)
+		if !strings.Contains(stdOutEntries[4], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
+		}
+
+		expected = fmt.Sprintf("version=%s", version)
 		if !strings.Contains(stdOutEntries[4], expected) {
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
 		}
@@ -436,7 +453,7 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Failed connection", func(t *testing.T) {
 		t.Parallel()
 
-		envConfig := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:1433",
 			Interval:      1 * time.Second,
@@ -455,7 +472,7 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		if err := waitForTarget(ctx, envConfig, logger); err != nil {
+		if err := waitForTarget(ctx, cfg, logger); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
@@ -468,20 +485,20 @@ func TestRunLoop(t *testing.T) {
 	t.Run("Context timeout", func(t *testing.T) {
 		t.Parallel()
 
-		envConfig := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:3306",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
 		logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
-		err := waitForTarget(ctx, envConfig, logger)
+		err := waitForTarget(ctx, cfg, logger)
 		if err != nil && err != context.DeadlineExceeded {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -489,14 +506,13 @@ func TestRunLoop(t *testing.T) {
 		expected := "context deadline exceeded"
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error %q but got %q", expected, err.Error())
-			fmt.Println(stdErr.String())
 		}
 	})
 
 	t.Run("Context cancel", func(t *testing.T) {
 		t.Parallel()
 
-		envConfig := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:9042",
 			Interval:      1 * time.Second,
@@ -514,7 +530,7 @@ func TestRunLoop(t *testing.T) {
 			cancel()
 		}()
 
-		err := waitForTarget(ctx, envConfig, logger)
+		err := waitForTarget(ctx, cfg, logger)
 		// waitForTarget returns nil if context is canceled
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -525,7 +541,7 @@ func TestRunLoop(t *testing.T) {
 func TestConcurrentConnections(t *testing.T) {
 	t.Parallel()
 
-	envConfig := Config{
+	cfg := Config{
 		TargetName:    "database",
 		TargetAddress: "localhost:9200",
 		Interval:      1 * time.Second,
@@ -533,7 +549,7 @@ func TestConcurrentConnections(t *testing.T) {
 	}
 
 	// Setup a mock server to listen on localhost:5432
-	lis, err := net.Listen("tcp", envConfig.TargetAddress)
+	lis, err := net.Listen("tcp", cfg.TargetAddress)
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
@@ -552,7 +568,7 @@ func TestConcurrentConnections(t *testing.T) {
 	for i := 0; i < numRoutines; i++ {
 		go func() {
 			defer wg.Done()
-			err := waitForTarget(ctx, envConfig, logger)
+			err := waitForTarget(ctx, cfg, logger)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -567,7 +583,7 @@ func TestConcurrentConnections(t *testing.T) {
 
 	wg.Wait()
 
-	expected := fmt.Sprintf("%s is ready ✓", envConfig.TargetName)
+	expected := fmt.Sprintf("%s is ready ✓", cfg.TargetName)
 	if !strings.Contains(stdOut.String(), expected) {
 		t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 	}
@@ -595,7 +611,7 @@ func TestRun(t *testing.T) {
 		}
 		defer lis.Close()
 
-		var stdErr, stdOut strings.Builder
+		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -607,9 +623,6 @@ func TestRun(t *testing.T) {
 
 		if err := run(ctx, getenv, &stdOut); err != nil {
 			t.Errorf("Unexpected error: %v", err)
-		}
-		if stdErr.String() != "" {
-			t.Errorf("Unexpected error: %v", stdErr.String())
 		}
 
 		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
@@ -680,6 +693,65 @@ func TestRun(t *testing.T) {
 		expected := "invalid TARGET_ADDRESS format, must be host:port"
 		if !strings.Contains(err.Error(), expected) {
 			t.Errorf("Expected error %q but got %q", expected, err.Error())
+		}
+	})
+
+	t.Run("LogAdditionalFields set to true", func(t *testing.T) {
+		t.Parallel()
+
+		env := map[string]string{
+			"TARGET_NAME":           "database",
+			"TARGET_ADDRESS":        "localhost:8092",
+			"INTERVAL":              "1s",
+			"DIAL_TIMEOUT":          "1s",
+			"LOG_ADDITIONAL_FIELDS": "true",
+		}
+
+		getenv := func(key string) string {
+			return env[key]
+		}
+
+		// Setup a mock server to listen on localhost:8092
+		lis, err := net.Listen("tcp", env["TARGET_ADDRESS"])
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		defer lis.Close()
+
+		var stdOut strings.Builder
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// cancel run after 2 Seconds
+		go func() {
+			time.Sleep(2 * time.Second)
+			cancel()
+		}()
+
+		if err := run(ctx, getenv, &stdOut); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
+
+		expectedOuts := 2
+		if len(stdOutEntries) != expectedOuts {
+			t.Errorf("Expected output to contain '%d' lines but got '%d'", expectedOuts, len(stdOutEntries))
+		}
+
+		expected := fmt.Sprintf("Waiting for %s to become ready...", env["TARGET_NAME"])
+		if !strings.Contains(stdOutEntries[0], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
+		}
+
+		expected = fmt.Sprintf("%s is ready ✓", env["TARGET_NAME"])
+		if !strings.Contains(stdOutEntries[1], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
+		}
+
+		expected = fmt.Sprintf("version=%s", version)
+		if !strings.Contains(stdOutEntries[1], expected) {
+			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
 }

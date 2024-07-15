@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.22"
+const version = "0.0.23"
 
 // Config holds the required environment variables.
 type Config struct {
@@ -26,6 +26,7 @@ type Config struct {
 }
 
 // parseConfig retrieves and parses the required environment variables.
+// Provides default values if the environment variables are not set.
 func parseConfig(getenv func(string) string) (Config, error) {
 	cfg := Config{
 		TargetName:          getenv("TARGET_NAME"),
@@ -62,7 +63,7 @@ func parseConfig(getenv func(string) string) (Config, error) {
 	return cfg, nil
 }
 
-// validateConfig check if the configuration is valid.
+// validateConfig checks if the configuration is valid.
 func validateConfig(cfg *Config) error {
 	if cfg.TargetName == "" {
 		return fmt.Errorf("TARGET_NAME environment variable is required")
@@ -131,29 +132,41 @@ func waitForTarget(ctx context.Context, cfg Config, logger *slog.Logger) error {
 	}
 }
 
-// run is the main entry point
+// run is the main entry point.
+// It sets up signal handling, configuration parsing, and starts the waitForTarget loop.
 func run(ctx context.Context, getenv func(string) string, output io.Writer) error {
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	cfg, err := parseConfig(getenv)
 	if err != nil {
-		return err
+		return fmt.Errorf("configuration error: %w", err)
 	}
 
 	if err := validateConfig(&cfg); err != nil {
-		return err
+		return fmt.Errorf("validation error: %w", err)
 	}
 
-	logger := slog.New(slog.NewTextHandler(output, nil))
+	// Configure logger
+	var logger *slog.Logger
 	if cfg.LogAdditionalFields {
-		logger = logger.With(
+		logger = slog.New(slog.NewTextHandler(output, &slog.HandlerOptions{})).With(
 			"target_name", cfg.TargetName,
 			"target_address", cfg.TargetAddress,
 			"interval", cfg.Interval.String(),
 			"dial_timeout", cfg.DialTimeout.String(),
 			"version", version,
 		)
+	} else {
+		handler := slog.NewTextHandler(output, &slog.HandlerOptions{
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if a.Key == "error" {
+					return slog.Attr{}
+				}
+				return a
+			},
+		})
+		logger = slog.New(handler)
 	}
 
 	return waitForTarget(ctx, cfg, logger)
