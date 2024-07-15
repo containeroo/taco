@@ -1,3 +1,5 @@
+![logo](.github/assets/taco.svg)
+
 # TACO (TCP Availability Connection Observer)
 
 This is a simple Go application with zero external dependencies that checks if a specified TCP target is available. It continuously attempts to connect to the specified target at regular intervals until the target becomes available or the program is terminated.
