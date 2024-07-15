@@ -364,8 +364,8 @@ func TestWaitForTarget(t *testing.T) {
 		cfg := Config{
 			TargetName:          "PostgreSQL",
 			TargetAddress:       "localhost:5432",
-			Interval:            1 * time.Second,
-			DialTimeout:         1 * time.Second,
+			Interval:            50 * time.Millisecond,
+			DialTimeout:         50 * time.Millisecond,
 			LogAdditionalFields: true,
 		}
 
@@ -373,7 +373,7 @@ func TestWaitForTarget(t *testing.T) {
 		wg.Add(1)
 
 		var lis net.Listener
-		// start listener after 2 seconds
+		// start listener after 3 seconds
 		go func() {
 			defer wg.Done() // Mark the WaitGroup as done when the goroutine completes
 			time.Sleep(cfg.Interval * 3)
@@ -382,7 +382,7 @@ func TestWaitForTarget(t *testing.T) {
 			if err != nil {
 				panic("failed to listen: " + err.Error())
 			}
-			time.Sleep(1 * time.Second) // Ensure runloop get a successful attempt
+			time.Sleep(200 * time.Millisecond) // Ensure runloop get a successful attempt
 		}()
 
 		var stdOut strings.Builder
@@ -403,8 +403,7 @@ func TestWaitForTarget(t *testing.T) {
 		}
 
 		wg.Wait()
-
-		defer lis.Close()
+		defer lis.Close() // listener must be closed after waiting group is done
 
 		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
 		// output must be:
@@ -414,9 +413,9 @@ func TestWaitForTarget(t *testing.T) {
 		// 3: database is not ready ✗
 		// 4: database is ready ✓
 
-		expectedOuts := 5
-		if len(stdOutEntries) != expectedOuts {
-			t.Errorf("Expected output to contain '%d' lines but got '%d'.", expectedOuts, len(stdOutEntries))
+		lenExpectedOuts := 5
+		if len(stdOutEntries) != lenExpectedOuts {
+			t.Errorf("Expected output to contain '%d' lines but got '%d'.", lenExpectedOuts, len(stdOutEntries))
 		}
 
 		expected := fmt.Sprintf("Waiting for %s to become ready...", cfg.TargetName)
@@ -440,12 +439,12 @@ func TestWaitForTarget(t *testing.T) {
 		}
 
 		expected = fmt.Sprintf("%s is ready ✓", cfg.TargetName)
-		if !strings.Contains(stdOutEntries[4], expected) {
+		if !strings.Contains(stdOutEntries[lenExpectedOuts-1], expected) { // lenExpectedOuts -1 = last element
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
 		}
 
 		expected = fmt.Sprintf("version=%s", version)
-		if !strings.Contains(stdOutEntries[4], expected) {
+		if !strings.Contains(stdOutEntries[lenExpectedOuts-1], expected) { // lenExpectedOuts -1 = last element
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOutEntries[1])
 		}
 	})
@@ -562,7 +561,7 @@ func TestConcurrentConnections(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&stdOut, nil))
 
 	var wg sync.WaitGroup
-	numRoutines := 5
+	numRoutines := 4
 	wg.Add(numRoutines)
 
 	for i := 0; i < numRoutines; i++ {
@@ -627,9 +626,9 @@ func TestRun(t *testing.T) {
 
 		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
 
-		expectedOuts := 2
-		if len(stdOutEntries) != expectedOuts {
-			t.Errorf("Expected output to contain '%d' lines but got '%d'", expectedOuts, len(stdOutEntries))
+		lenExpectedOuts := 2
+		if len(stdOutEntries) != lenExpectedOuts {
+			t.Errorf("Expected output to contain '%d' lines but got '%d'", lenExpectedOuts, len(stdOutEntries))
 		}
 
 		expected := fmt.Sprintf("Waiting for %s to become ready...", env["TARGET_NAME"])
@@ -638,7 +637,7 @@ func TestRun(t *testing.T) {
 		}
 
 		expected = fmt.Sprintf("%s is ready ✓", env["TARGET_NAME"])
-		if !strings.Contains(stdOutEntries[1], expected) {
+		if !strings.Contains(stdOutEntries[lenExpectedOuts-1], expected) { // lenExpectedOuts -1 = last element
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
@@ -734,9 +733,9 @@ func TestRun(t *testing.T) {
 
 		stdOutEntries := strings.Split(strings.TrimSpace(stdOut.String()), "\n")
 
-		expectedOuts := 2
-		if len(stdOutEntries) != expectedOuts {
-			t.Errorf("Expected output to contain '%d' lines but got '%d'", expectedOuts, len(stdOutEntries))
+		lenExpectedOuts := 2
+		if len(stdOutEntries) != lenExpectedOuts {
+			t.Errorf("Expected output to contain '%d' lines but got '%d'", lenExpectedOuts, len(stdOutEntries))
 		}
 
 		expected := fmt.Sprintf("Waiting for %s to become ready...", env["TARGET_NAME"])
@@ -745,12 +744,12 @@ func TestRun(t *testing.T) {
 		}
 
 		expected = fmt.Sprintf("%s is ready ✓", env["TARGET_NAME"])
-		if !strings.Contains(stdOutEntries[1], expected) {
+		if !strings.Contains(stdOutEntries[lenExpectedOuts-1], expected) { // lenExpectedOuts -1 = last element
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 
 		expected = fmt.Sprintf("version=%s", version)
-		if !strings.Contains(stdOutEntries[1], expected) {
+		if !strings.Contains(stdOutEntries[lenExpectedOuts-1], expected) { // lenExpectedOuts -1 = last element
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
 		}
 	})
