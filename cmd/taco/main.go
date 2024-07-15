@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.23"
+const version = "0.0.22"
 
 // Config holds the required environment variables.
 type Config struct {
