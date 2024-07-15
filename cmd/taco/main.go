@@ -159,6 +159,7 @@ func run(ctx context.Context, getenv func(string) string, output io.Writer) erro
 		)
 	} else {
 		handler := slog.NewTextHandler(output, &slog.HandlerOptions{
+			// Ignore the error attribute
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 				if a.Key == "error" {
 					return slog.Attr{}
