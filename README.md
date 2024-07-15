@@ -49,6 +49,19 @@ Configure your Kubernetes deployment to use this init container:
 
 ```yaml
 initContainers:
+  - name: wait-for-valkey
+    image: ghcr.io/containeroo/taco:latest
+    env:
+      - name: TARGET_NAME
+        value: valkey
+      - name: TARGET_ADDRESS
+        value: valkey.default.svc.cluster.local:6379
+      - name: INTERVAL
+        value: "2s" # Specify the interval duration, e.g., 2 seconds
+      - name: DIAL_TIMEOUT
+        value: "2s" # Specify the dial timeout duration, e.g., 2 seconds
+      - name: LOG_ADDITIONAL_FIELDS
+        value: "true"
   - name: wait-for-postgres
     image: ghcr.io/containeroo/taco:latest
     env:
