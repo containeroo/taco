@@ -1,4 +1,6 @@
-![logo](.github/assets/taco.svg)
+<p align="center">
+  <img src=".github/assets/taco.svg" />
+</p>
 
 # TACO (TCP Availability Connection Observer)
 
