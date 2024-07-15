@@ -147,7 +147,6 @@ func run(ctx context.Context, getenv func(string) string, output io.Writer) erro
 		return fmt.Errorf("validation error: %w", err)
 	}
 
-	// Configure logger
 	var logger *slog.Logger
 	if cfg.LogAdditionalFields {
 		logger = slog.New(slog.NewTextHandler(output, &slog.HandlerOptions{})).With(
@@ -159,7 +158,7 @@ func run(ctx context.Context, getenv func(string) string, output io.Writer) erro
 		)
 	} else {
 		handler := slog.NewTextHandler(output, &slog.HandlerOptions{
-			// Ignore the error attribute
+			// Ignore error fields
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 				if a.Key == "error" {
 					return slog.Attr{}
