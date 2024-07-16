@@ -116,45 +116,49 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Valid environment variables", func(t *testing.T) {
 		t.Parallel()
 
-		env := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			Interval:      1 * time.Second,
 			DialTimeout:   1 * time.Second,
 		}
 
-		err := validateConfig(&env)
+		err := validateConfig(&cfg)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	})
 
-	t.Run("Missing TARGET_NAME", func(t *testing.T) {
+	t.Run("Generate TARGET_NAME", func(t *testing.T) {
 		t.Parallel()
 
-		env := Config{
+		cfg := Config{
 			TargetAddress: "localhost:5432",
 		}
 
-		err := validateConfig(&env)
-		if err == nil {
-			t.Error("Expected error but got none")
+		err := validateConfig(&cfg)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expected := "TARGET_NAME environment variable is required"
-		if err.Error() != expected {
-			t.Errorf("Expected output %q but got %q", expected, err.Error())
+		if cfg.TargetName == "" {
+			t.Errorf("Expected TargetName to be generated")
+		}
+
+		expected := strings.SplitN(cfg.TargetAddress, ":", 2)[0]
+		if cfg.TargetName != expected {
+			t.Errorf("Expected target name %q but got %q", expected, cfg.TargetName)
 		}
 	})
 
 	t.Run("Missing TARGET_ADDRESS", func(t *testing.T) {
 		t.Parallel()
 
-		env := Config{
+		cfg := Config{
 			TargetName: "database",
 		}
 
-		err := validateConfig(&env)
+		err := validateConfig(&cfg)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -168,12 +172,12 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid TARGET_ADDRESS (port)", func(t *testing.T) {
 		t.Parallel()
 
-		env := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost",
 		}
 
-		err := validateConfig(&env)
+		err := validateConfig(&cfg)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -187,12 +191,12 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid TARGET_ADDRESS (schema)", func(t *testing.T) {
 		t.Parallel()
 
-		env := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "http://localhost:5432",
 		}
 
-		err := validateConfig(&env)
+		err := validateConfig(&cfg)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -206,13 +210,13 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid INTERVAL", func(t *testing.T) {
 		t.Parallel()
 
-		env := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			Interval:      -1 * time.Second,
 		}
 
-		err := validateConfig(&env)
+		err := validateConfig(&cfg)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -226,13 +230,13 @@ func TestValidateEnv(t *testing.T) {
 	t.Run("Invalid DIAL_TIMEOUT", func(t *testing.T) {
 		t.Parallel()
 
-		env := Config{
+		cfg := Config{
 			TargetName:    "database",
 			TargetAddress: "localhost:5432",
 			DialTimeout:   -1 * time.Second,
 		}
 
-		err := validateConfig(&env)
+		err := validateConfig(&cfg)
 		if err == nil {
 			t.Error("Expected error but got none")
 		}
@@ -639,32 +643,6 @@ func TestRun(t *testing.T) {
 		expected = fmt.Sprintf("%s is ready ✓", env["TARGET_NAME"])
 		if !strings.Contains(stdOutEntries[lenExpectedOuts-1], expected) { // lenExpectedOuts -1 = last element
 			t.Errorf("Expected output to contain %q but got %q", expected, stdOut.String())
-		}
-	})
-
-	t.Run("Failed run due to missing environment variable", func(t *testing.T) {
-		t.Parallel()
-
-		env := map[string]string{
-			"TARGET_ADDRESS": "localhost:50000",
-		}
-
-		getenv := func(key string) string {
-			return env[key]
-		}
-
-		var stdOut strings.Builder
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		err := run(ctx, getenv, &stdOut)
-		if err == nil {
-			t.Error("Expected error but got none")
-		}
-
-		expected := "TARGET_NAME environment variable is required"
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("Expected error %q but got %q", expected, err.Error())
 		}
 	})
 

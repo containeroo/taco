@@ -8,13 +8,15 @@ This is a simple Go application with zero external dependencies that checks if a
 
 ## Environment Variables
 
-The application requires the following environment variables to be set:
+TACO accepts the following environment variables:
 
-- `TARGET_NAME`: The name of the target to check.
-- `TARGET_ADDRESS`: The address of the target in the format `host:port`.
+- `TARGET_ADDRESS`: The address of the target in the format `host:port` (required).
+- `TARGET_NAME`: The name of the target to check (optional, default: inferred from `TARGET_ADDRESS`)\*.
 - `INTERVAL`: The interval between connection attempts (optional, default: `2s`).
 - `DIAL_TIMEOUT`: The timeout for each connection attempt (optional, default: `1s`).
 - `LOG_ADDITIONAL_FIELDS`: Log additional fields (optional, default: `false`).
+
+**\*** If `TARGET_NAME` is not set, the name will be inferred from the host part of the target address as follows: `postgres.default.svc.cluster.local:5432` will be inferred as `postgres`.
 
 ## Behavior Flowchart
 

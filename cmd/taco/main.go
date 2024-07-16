@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.22"
+const version = "0.0.23"
 
 // Config holds the required environment variables.
 type Config struct {
@@ -65,10 +65,6 @@ func parseConfig(getenv func(string) string) (Config, error) {
 
 // validateConfig checks if the configuration is valid.
 func validateConfig(cfg *Config) error {
-	if cfg.TargetName == "" {
-		return fmt.Errorf("TARGET_NAME environment variable is required")
-	}
-
 	if cfg.TargetAddress == "" {
 		return fmt.Errorf("TARGET_ADDRESS environment variable is required")
 	}
@@ -79,6 +75,13 @@ func validateConfig(cfg *Config) error {
 
 	if !strings.Contains(cfg.TargetAddress, ":") {
 		return fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
+	}
+
+	if cfg.TargetName == "" {
+		// if the target name is not set, try to infer it from the host part of the target address
+		hostPart := strings.SplitN(cfg.TargetAddress, ":", 2)[0] // get the host part
+		hostSegments := strings.SplitN(hostPart, ".", 2)         // get the first part of the host
+		cfg.TargetName = hostSegments[0]
 	}
 
 	if cfg.Interval < 0 {
