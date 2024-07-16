@@ -32,7 +32,7 @@ graph TD;
 
 With the `LOG_ADDITIONAL_FIELDS` environment variable set to `true` additional fields will be logged.
 
-## With additional fields
+### With additional fields
 
 ```
 
@@ -44,7 +44,7 @@ ts=2024-07-05T13:08:27+02:00 level=INFO msg="PostgreSQL is ready ✓" dial_timeo
 
 ```
 
-## Without additional fields
+### Without additional fields
 
 ```
 
