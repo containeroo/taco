@@ -16,6 +16,14 @@ import (
 
 const version = "0.0.24"
 
+const (
+	envTargetName          = "TARGET_NAME"
+	envTargetAddress       = "TARGET_ADDRESS"
+	envInterval            = "INTERVAL"
+	envDialTimeout         = "DIAL_TIMEOUT"
+	envLogAdditionalFields = "LOG_ADDITIONAL_FIELDS"
+)
+
 // Config holds the required environment variables.
 type Config struct {
 	TargetName          string        // The name of the target to check.
@@ -29,34 +37,34 @@ type Config struct {
 // Provides default values if the environment variables are not set.
 func parseConfig(getenv func(string) string) (Config, error) {
 	cfg := Config{
-		TargetName:          getenv("TARGET_NAME"),
-		TargetAddress:       getenv("TARGET_ADDRESS"),
+		TargetName:          getenv(envTargetName),
+		TargetAddress:       getenv(envTargetAddress),
 		Interval:            2 * time.Second, // default interval
 		DialTimeout:         1 * time.Second, // default dial timeout
 		LogAdditionalFields: false,
 	}
 
-	if intervalStr := getenv("INTERVAL"); intervalStr != "" {
+	if intervalStr := getenv(envInterval); intervalStr != "" {
 		var err error
 		cfg.Interval, err = time.ParseDuration(intervalStr)
 		if err != nil {
-			return Config{}, fmt.Errorf("invalid INTERVAL value: %s", err)
+			return Config{}, fmt.Errorf("invalid %s value: %s", envInterval, err)
 		}
 	}
 
-	if dialTimeoutStr := getenv("DIAL_TIMEOUT"); dialTimeoutStr != "" {
+	if dialTimeoutStr := getenv(envDialTimeout); dialTimeoutStr != "" {
 		var err error
 		cfg.DialTimeout, err = time.ParseDuration(dialTimeoutStr)
 		if err != nil {
-			return Config{}, fmt.Errorf("invalid DIAL_TIMEOUT value: %s", err)
+			return Config{}, fmt.Errorf("invalid %s value: %s", envDialTimeout, err)
 		}
 	}
 
-	if logFieldsStr := getenv("LOG_ADDITIONAL_FIELDS"); logFieldsStr != "" {
+	if logFieldsStr := getenv(envLogAdditionalFields); logFieldsStr != "" {
 		var err error
 		cfg.LogAdditionalFields, err = strconv.ParseBool(logFieldsStr)
 		if err != nil {
-			return Config{}, fmt.Errorf("invalid LOG_ADDITIONAL_FIELDS value: %s", err)
+			return Config{}, fmt.Errorf("invalid %s value: %s", envLogAdditionalFields, err)
 		}
 	}
 
@@ -66,15 +74,15 @@ func parseConfig(getenv func(string) string) (Config, error) {
 // validateConfig checks if the configuration is valid.
 func validateConfig(cfg *Config) error {
 	if cfg.TargetAddress == "" {
-		return fmt.Errorf("TARGET_ADDRESS environment variable is required")
+		return fmt.Errorf("%s environment variable is required", envTargetAddress)
 	}
 
 	if schema := strings.SplitN(cfg.TargetAddress, "://", 2); len(schema) > 1 {
-		return fmt.Errorf("TARGET_ADDRESS should not include a schema (%s)", schema[0])
+		return fmt.Errorf("%s should not include a schema (%s)", envTargetAddress, schema[0])
 	}
 
 	if !strings.Contains(cfg.TargetAddress, ":") {
-		return fmt.Errorf("invalid TARGET_ADDRESS format, must be host:port")
+		return fmt.Errorf("invalid %s format, must be host:port", envTargetAddress)
 	}
 
 	if cfg.TargetName == "" {
@@ -85,11 +93,11 @@ func validateConfig(cfg *Config) error {
 	}
 
 	if cfg.Interval < 0 {
-		return fmt.Errorf("invalid INTERVAL value: interval cannot be negative")
+		return fmt.Errorf("invalid %s value: interval cannot be negative", envInterval)
 	}
 
 	if cfg.DialTimeout < 0 {
-		return fmt.Errorf("invalid DIAL_TIMEOUT value: dial timeout cannot be negative")
+		return fmt.Errorf("invalid %s value: dial timeout cannot be negative", envDialTimeout)
 	}
 
 	return nil
