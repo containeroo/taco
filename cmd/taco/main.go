@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.23"
+const version = "0.0.24"
 
 // Config holds the required environment variables.
 type Config struct {
@@ -95,6 +95,30 @@ func validateConfig(cfg *Config) error {
 	return nil
 }
 
+// setupLogger configures the logger based on the configuration
+func setupLogger(cfg Config, output io.Writer) *slog.Logger {
+	handlerOpts := &slog.HandlerOptions{}
+
+	if cfg.LogAdditionalFields {
+		return slog.New(slog.NewTextHandler(output, handlerOpts)).With(
+			slog.String("target_address", cfg.TargetAddress),
+			slog.String("interval", cfg.Interval.String()),
+			slog.String("dial_timeout", cfg.DialTimeout.String()),
+			slog.String("version", version),
+		)
+	}
+
+	// If logAdditionalFields is false, remove the error attribute from the handler
+	handlerOpts.ReplaceAttr = func(groups []string, a slog.Attr) slog.Attr {
+		if a.Key == "error" {
+			return slog.Attr{}
+		}
+		return a
+	}
+
+	return slog.New(slog.NewTextHandler(output, handlerOpts))
+}
+
 // checkConnection tries to establish a connection to the given address.
 func checkConnection(ctx context.Context, dialer *net.Dialer, address string) error {
 	conn, err := dialer.DialContext(ctx, "tcp", address)
@@ -150,27 +174,7 @@ func run(ctx context.Context, getenv func(string) string, output io.Writer) erro
 		return fmt.Errorf("validation error: %w", err)
 	}
 
-	var logger *slog.Logger
-	if cfg.LogAdditionalFields {
-		logger = slog.New(slog.NewTextHandler(output, &slog.HandlerOptions{})).With(
-			"target_name", cfg.TargetName,
-			"target_address", cfg.TargetAddress,
-			"interval", cfg.Interval.String(),
-			"dial_timeout", cfg.DialTimeout.String(),
-			"version", version,
-		)
-	} else {
-		handler := slog.NewTextHandler(output, &slog.HandlerOptions{
-			// Ignore error fields
-			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-				if a.Key == "error" {
-					return slog.Attr{}
-				}
-				return a
-			},
-		})
-		logger = slog.New(handler)
-	}
+	logger := setupLogger(cfg, output)
 
 	return waitForTarget(ctx, cfg, logger)
 }
