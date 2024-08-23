@@ -389,10 +389,10 @@ func TestWaitForTarget(t *testing.T) {
 			time.Sleep(200 * time.Millisecond) // Ensure runloop get a successful attempt
 		}()
 
-		var stdOut strings.Builder
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		var stdOut strings.Builder
 		logger := slog.New(slog.NewTextHandler(&stdOut, &slog.HandlerOptions{}))
 		logger = logger.With(
 			"target_name", cfg.TargetName,
