@@ -14,7 +14,7 @@ TACO accepts the following environment variables:
 - `TARGET_NAME`: The name of the target to check (optional, default: inferred from `TARGET_ADDRESS`)\*.
 - `INTERVAL`: The interval between connection attempts (optional, default: `2s`).
 - `DIAL_TIMEOUT`: The timeout for each connection attempt (optional, default: `1s`).
-- `LOG_ADDITIONAL_FIELDS`: Log additional fields (optional, default: `false`).
+- `LOG_EXTRA_FIELDS`: Log additional fields (optional, default: `false`).
 
 **\*** If `TARGET_NAME` is not set, the name will be inferred from the host part of the target address as follows: `postgres.default.svc.cluster.local:5432` will be inferred as `postgres`.
 
@@ -32,7 +32,7 @@ graph TD;
 
 ## Logging
 
-With the `LOG_ADDITIONAL_FIELDS` environment variable set to `true` additional fields will be logged.
+With the `LOG_EXTRA_FIELDS` environment variable set to `true` additional fields will be logged.
 
 ### With additional fields
 
@@ -67,7 +67,7 @@ initContainers:
       # TARGET_NAME inferred from the target address "valkey.default.svc.cluster.local" which is okay for this use case
       # INTERVAL defaults to 2 seconds which is okay for this use case
       # DIAL_TIMEOUT defaults to 1 seconds which is okay for this use case
-      - name: LOG_ADDITIONAL_FIELDS
+      - name: LOG_EXTRA_FIELDS
         value: "true"
   - name: wait-for-postgres
     image: ghcr.io/containeroo/taco:latest

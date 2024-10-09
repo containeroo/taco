@@ -14,34 +14,34 @@ import (
 	"time"
 )
 
-const version = "0.0.25"
+const version = "0.0.26"
 
 const (
-	envTargetName          = "TARGET_NAME"
-	envTargetAddress       = "TARGET_ADDRESS"
-	envInterval            = "INTERVAL"
-	envDialTimeout         = "DIAL_TIMEOUT"
-	envLogAdditionalFields = "LOG_ADDITIONAL_FIELDS"
+	envTargetName     = "TARGET_NAME"
+	envTargetAddress  = "TARGET_ADDRESS"
+	envInterval       = "INTERVAL"
+	envDialTimeout    = "DIAL_TIMEOUT"
+	envLogExtraFields = "LOG_EXTRA_FIELDS"
 )
 
 // Config holds the required environment variables.
 type Config struct {
-	TargetName          string        // The name of the target to check.
-	TargetAddress       string        // The address of the target in the format 'host:port'.
-	Interval            time.Duration // The interval between connection attempts.
-	DialTimeout         time.Duration // The timeout for each connection attempt.
-	LogAdditionalFields bool          // Whether to log the fields in the log message.
+	TargetName     string        // The name of the target to check.
+	TargetAddress  string        // The address of the target in the format 'host:port'.
+	Interval       time.Duration // The interval between connection attempts.
+	DialTimeout    time.Duration // The timeout for each connection attempt.
+	LogExtraFields bool          // Whether to log the fields in the log message.
 }
 
 // parseConfig retrieves and parses the required environment variables.
 // Provides default values if the environment variables are not set.
 func parseConfig(getenv func(string) string) (Config, error) {
 	cfg := Config{
-		TargetName:          getenv(envTargetName),
-		TargetAddress:       getenv(envTargetAddress),
-		Interval:            2 * time.Second, // default interval
-		DialTimeout:         1 * time.Second, // default dial timeout
-		LogAdditionalFields: false,
+		TargetName:     getenv(envTargetName),
+		TargetAddress:  getenv(envTargetAddress),
+		Interval:       2 * time.Second, // default interval
+		DialTimeout:    1 * time.Second, // default dial timeout
+		LogExtraFields: false,
 	}
 
 	if intervalStr := getenv(envInterval); intervalStr != "" {
@@ -60,11 +60,11 @@ func parseConfig(getenv func(string) string) (Config, error) {
 		}
 	}
 
-	if logFieldsStr := getenv(envLogAdditionalFields); logFieldsStr != "" {
+	if logFieldsStr := getenv(envLogExtraFields); logFieldsStr != "" {
 		var err error
-		cfg.LogAdditionalFields, err = strconv.ParseBool(logFieldsStr)
+		cfg.LogExtraFields, err = strconv.ParseBool(logFieldsStr)
 		if err != nil {
-			return Config{}, fmt.Errorf("invalid %s value: %s", envLogAdditionalFields, err)
+			return Config{}, fmt.Errorf("invalid %s value: %s", envLogExtraFields, err)
 		}
 	}
 
@@ -107,7 +107,7 @@ func validateConfig(cfg *Config) error {
 func setupLogger(cfg Config, output io.Writer) *slog.Logger {
 	handlerOpts := &slog.HandlerOptions{}
 
-	if cfg.LogAdditionalFields {
+	if cfg.LogExtraFields {
 		return slog.New(slog.NewTextHandler(output, handlerOpts)).With(
 			slog.String("target_address", cfg.TargetAddress),
 			slog.String("interval", cfg.Interval.String()),

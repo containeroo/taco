@@ -17,11 +17,11 @@ func TestParseEnv(t *testing.T) {
 		t.Parallel()
 
 		env := map[string]string{
-			"TARGET_NAME":           "database",
-			"TARGET_ADDRESS":        "localhost:5432",
-			"INTERVAL":              "1s",
-			"DIAL_TIMEOUT":          "1s",
-			"LOG_ADDITIONAL_FIELDS": "true",
+			"TARGET_NAME":      "database",
+			"TARGET_ADDRESS":   "localhost:5432",
+			"INTERVAL":         "1s",
+			"DIAL_TIMEOUT":     "1s",
+			"LOG_EXTRA_FIELDS": "true",
 		}
 
 		getenv := func(key string) string {
@@ -34,11 +34,11 @@ func TestParseEnv(t *testing.T) {
 		}
 
 		expected := Config{
-			TargetName:          "database",
-			TargetAddress:       "localhost:5432",
-			Interval:            1 * time.Second,
-			DialTimeout:         1 * time.Second,
-			LogAdditionalFields: true,
+			TargetName:     "database",
+			TargetAddress:  "localhost:5432",
+			Interval:       1 * time.Second,
+			DialTimeout:    1 * time.Second,
+			LogExtraFields: true,
 		}
 		if !reflect.DeepEqual(cfg, expected) {
 			t.Errorf("Expected %+v, got %+v", expected, cfg)
@@ -89,11 +89,11 @@ func TestParseEnv(t *testing.T) {
 		}
 	})
 
-	t.Run("Invalid LOG_ADDITIONAL_FIELDS", func(t *testing.T) {
+	t.Run("Invalid LOG_EXTRA_FIELDS", func(t *testing.T) {
 		t.Parallel()
 
 		env := map[string]string{
-			"LOG_ADDITIONAL_FIELDS": "tr",
+			"LOG_EXTRA_FIELDS": "tr",
 		}
 
 		getenv := func(key string) string {
@@ -105,7 +105,7 @@ func TestParseEnv(t *testing.T) {
 			t.Error("Expected error but got none")
 		}
 
-		expected := fmt.Sprintf("invalid LOG_ADDITIONAL_FIELDS value: strconv.ParseBool: parsing \"%s\": invalid syntax", env["LOG_ADDITIONAL_FIELDS"])
+		expected := fmt.Sprintf("invalid LOG_EXTRA_FIELDS value: strconv.ParseBool: parsing \"%s\": invalid syntax", env["LOG_EXTRA_FIELDS"])
 		if err.Error() != expected {
 			t.Errorf("Expected output %q but got %q", expected, err.Error())
 		}
@@ -366,11 +366,11 @@ func TestWaitForTarget(t *testing.T) {
 		t.Parallel()
 
 		cfg := Config{
-			TargetName:          "PostgreSQL",
-			TargetAddress:       "localhost:5432",
-			Interval:            50 * time.Millisecond,
-			DialTimeout:         50 * time.Millisecond,
-			LogAdditionalFields: true,
+			TargetName:     "PostgreSQL",
+			TargetAddress:  "localhost:5432",
+			Interval:       50 * time.Millisecond,
+			DialTimeout:    50 * time.Millisecond,
+			LogExtraFields: true,
 		}
 
 		var wg sync.WaitGroup
@@ -677,11 +677,11 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		env := map[string]string{
-			"TARGET_NAME":           "database",
-			"TARGET_ADDRESS":        "localhost:8092",
-			"INTERVAL":              "1s",
-			"DIAL_TIMEOUT":          "1s",
-			"LOG_ADDITIONAL_FIELDS": "true",
+			"TARGET_NAME":      "database",
+			"TARGET_ADDRESS":   "localhost:8092",
+			"INTERVAL":         "1s",
+			"DIAL_TIMEOUT":     "1s",
+			"LOG_EXTRA_FIELDS": "true",
 		}
 
 		getenv := func(key string) string {
