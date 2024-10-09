@@ -2,6 +2,12 @@
   <img src=".github/assets/taco.svg" />
 </p>
 
+# DEPRECATION WARNING
+
+`TACO` is deprecated and will be removed in the future.
+Please use the fully compatible [containeroo/portpatrol](https://github.com/containeroo/portpatrol) instead.
+
+
 # TACO (TCP Availability Connection Observer)
 
 This is a simple Go application with zero external dependencies that checks if a specified TCP target is available. It continuously attempts to connect to the specified target at regular intervals until the target becomes available or the program is terminated.
