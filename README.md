@@ -62,27 +62,22 @@ initContainers:
   - name: wait-for-valkey
     image: ghcr.io/containeroo/taco:latest
     env:
-      - name: TARGET_NAME
-        value: valkey
       - name: TARGET_ADDRESS
         value: valkey.default.svc.cluster.local:6379
-      - name: INTERVAL
-        value: "2s" # Specify the interval duration, e.g., 2 seconds
-      - name: DIAL_TIMEOUT
-        value: "2s" # Specify the dial timeout duration, e.g., 2 seconds
+      # TARGET_NAME inferred from the target address "valkey.default.svc.cluster.local" which is okay for this use case
+      # INTERVAL defaults to 2 seconds which is okay for this use case
+      # DIAL_TIMEOUT defaults to 1 seconds which is okay for this use case
       - name: LOG_ADDITIONAL_FIELDS
         value: "true"
   - name: wait-for-postgres
     image: ghcr.io/containeroo/taco:latest
     env:
       - name: TARGET_NAME
-        value: PostgreSQL
+        value: PostgreSQL # Use a better name for the target
       - name: TARGET_ADDRESS
         value: postgres.default.svc.cluster.local:5432
       - name: INTERVAL
-        value: "2s" # Specify the interval duration, e.g., 2 seconds
+        value: "4s" # Increase the interval duration, e.g., 4 seconds
       - name: DIAL_TIMEOUT
-        value: "2s" # Specify the dial timeout duration, e.g., 2 seconds
-      - name: LOG_ADDITIONAL_FIELDS
-        value: "true"
+        value: "2s" # Increase the dial timeout duration, e.g., 2 seconds
 ```
