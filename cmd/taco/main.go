@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const version = "0.0.24"
+const version = "0.0.25"
 
 const (
 	envTargetName          = "TARGET_NAME"
